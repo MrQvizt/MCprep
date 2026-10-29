@@ -14,58 +14,6 @@ export const BLOG_CATEGORIES = [
   { name: "Company News", slug: "company-news", description: "News from MC PREPS." },
 ];
 
-export const PLANS = [
-  {
-    slug: "1-week",
-    name: "1 Week",
-    tagline: "Starter",
-    description: "Try MC PREPS for a week and see how meal prep fits your routine.",
-    durationDays: 7,
-    features: ["Macro-tracked meals", "Cooked fresh", "Collection or delivery"],
-    isRecommended: false,
-    sortOrder: 0,
-    demoPriceCents: 6500,
-  },
-  {
-    slug: "2-weeks",
-    name: "2 Weeks",
-    tagline: "Popular",
-    description: "Two weeks to build the habit and settle into a routine.",
-    durationDays: 14,
-    features: ["Macro-tracked meals", "Cooked fresh every week", "Collection or delivery"],
-    isRecommended: true,
-    sortOrder: 1,
-    demoPriceCents: 12000,
-  },
-  {
-    slug: "1-month",
-    name: "1 Month",
-    tagline: "Commitment",
-    description: "Your weekday nutrition sorted for the month ahead.",
-    durationDays: 28,
-    features: ["Macro-tracked meals", "Cooked fresh every week", "Collection or delivery", "Fewer decisions, more consistency"],
-    isRecommended: false,
-    sortOrder: 2,
-    demoPriceCents: 22000,
-  },
-];
-
-export const MEAL_CHICKEN_POKEBOWL = {
-  slug: "chicken-pokebowl",
-  name: "Chicken Pokébowl",
-  shortDescription: "A macro-counted chicken poké bowl from the MC PREPS menu.",
-  description:
-    "One of the meals featured on the MC PREPS Instagram. Calories and macros are listed below so you can fit it into your day.",
-  calories: 544,
-  proteinG: 45,
-  carbsG: 63,
-  fatG: 7,
-  nutritionSource:
-    "Figures sourced from the MC PREPS Instagram post (brand screenshot). Verify against the current recipe before launch.",
-  nutritionVerified: false,
-  isFeatured: true,
-};
-
 export const FAQS = [
   {
     question: "How does ordering work?",

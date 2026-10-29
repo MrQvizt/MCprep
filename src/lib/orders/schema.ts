@@ -31,9 +31,16 @@ export const attributionSchema = z
   .partial()
   .optional();
 
+export const mealChoiceSchema = z.object({
+  mealId: z.string().min(1).max(60),
+  quantity: z.number().int().min(0).max(60),
+});
+
 export const orderFieldsSchema = z.object({
     idempotencyKey: z.string().uuid("Please refresh the page and try again."),
     planSlug: z.string().min(1, "Choose a plan."),
+    /** Packages: how many of each dish per week (must add up to the package's meals per week). */
+    mealSelections: z.array(mealChoiceSchema).max(30).default([]),
     fullName: z.string().trim().min(2, "Enter your full name.").max(120, "That name is too long."),
     email: z.string().trim().email("Enter a valid email address.").max(200),
     phone: z.string().trim().regex(PHONE_LOOSE_RE, "Enter a valid phone number, e.g. 7912 3456."),

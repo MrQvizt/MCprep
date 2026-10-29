@@ -24,9 +24,10 @@ export interface PromotionFormValues {
   badgeText: string | null;
   ctaText: string;
   image: PickedMedia | null;
-  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
+  discountType: "PERCENTAGE" | "FIXED_AMOUNT" | "FIRST_WEEK_MEAL_PRICE";
   discountValue: number;
   maxDiscountCents: number | null;
+  personalWindowMinutes: number | null;
   audience: "ALL_CUSTOMERS" | "NEW_CUSTOMERS" | "SELECTED_CUSTOMERS";
   requiresCode: boolean;
   code: string | null;
@@ -174,6 +175,7 @@ export function PromotionForm({
             [
               ["PERCENTAGE", "Percentage off"],
               ["FIXED_AMOUNT", "Fixed amount off"],
+              ["FIRST_WEEK_MEAL_PRICE", "First week at a price per meal"],
             ] as const
           ).map(([value, label]) => (
             <label key={value} className="flex items-center gap-2 text-sm">
@@ -210,6 +212,17 @@ export function PromotionForm({
                 {(id) => <MoneyInput id={id} name="maxDiscount" defaultCents={promotion?.maxDiscountCents ?? null} />}
               </Field>
             </>
+          ) : discountType === "FIRST_WEEK_MEAL_PRICE" ? (
+            <Field
+              label="First-week price per meal (EUR)"
+              name="mealPrice"
+              required
+              hint="Packages only. E.g. €6: a 10-meal week costs €60 in the first week; monthly subscriptions get their first week at this price, then the normal price."
+            >
+              {(id) => (
+                <MoneyInput id={id} name="mealPrice" defaultCents={promotion?.discountType === "FIRST_WEEK_MEAL_PRICE" ? promotion.discountValue : null} />
+              )}
+            </Field>
           ) : (
             <Field label="Amount off (EUR)" name="discountAmount" required>
               {(id) => (
@@ -352,6 +365,21 @@ export function PromotionForm({
         </div>
         <div className="mt-6 space-y-3">
           <CheckboxField name="showCountdown" label="Show the countdown timer" defaultChecked={promotion?.showCountdown ?? true} />
+          <div className="rounded-md border p-4">
+            <CheckboxField
+              name="personalWindowEnabled"
+              label="Personal deadline for each visitor"
+              hint="e.g. “Order within the next 2 hours”. Each visitor's timer starts the first time they see the offer, never restarts, and the price is only honoured if they order before it ends."
+              defaultChecked={Boolean(promotion?.personalWindowMinutes)}
+            />
+            <div className="mt-3 max-w-xs">
+              <Field label="Minutes after first seeing the offer" name="personalWindowMinutes">
+                {(id) => (
+                  <Input id={id} name="personalWindowMinutes" inputMode="numeric" defaultValue={promotion?.personalWindowMinutes ?? 120} />
+                )}
+              </Field>
+            </div>
+          </div>
           <CheckboxField
             name="showOnHomepage"
             label="Show the banner on the homepage"

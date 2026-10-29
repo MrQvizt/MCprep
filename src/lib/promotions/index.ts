@@ -38,6 +38,7 @@ export function toPricingPromotion(p: PromotionWithPlans, redemptionCount: numbe
     priority: p.priority,
     totalRedemptionLimit: p.totalRedemptionLimit,
     redemptionCount,
+    personalWindowMinutes: p.personalWindowMinutes,
   };
 }
 
@@ -84,6 +85,10 @@ export interface PublicPromotion {
   planIds: string[];
   state: PromotionState;
   expiredMessage: string | null;
+  /** Minutes the offer stays open after a visitor first sees it (personal countdown), if set. */
+  personalWindowMinutes: number | null;
+  discountType: string;
+  discountValue: number;
 }
 
 type PromotionForPublic = Promotion & {
@@ -115,6 +120,9 @@ export function toPublicPromotion(p: PromotionForPublic, redemptionCount: number
     planIds: p.eligiblePlans.map((e) => e.planId),
     state: promotionState({ ...p, redemptionCount }, now),
     expiredMessage: p.expiredMessage,
+    personalWindowMinutes: p.personalWindowMinutes,
+    discountType: p.discountType,
+    discountValue: p.discountValue,
   };
 }
 

@@ -1,6 +1,14 @@
 /** Client-safe promotion text helpers. */
 
 export function discountShortLabel(discountType: string, discountValue: number, currency = "EUR"): string {
+  if (discountType === "FIRST_WEEK_MEAL_PRICE") {
+    const amount = new Intl.NumberFormat("en-MT", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: discountValue % 100 === 0 ? 0 : 2,
+    }).format(discountValue / 100);
+    return `${amount}/meal`;
+  }
   if (discountType === "PERCENTAGE") {
     const pct = discountValue / 100;
     return `${Number.isInteger(pct) ? pct : pct.toFixed(2).replace(/0$/, "")}%`;

@@ -13,6 +13,12 @@ export interface OrderEmailData {
   planName: string;
   planDurationDays: number;
   planMealsIncluded: number | null;
+  /** Packages: "Lunch + Dinner · 5 days". */
+  packageLabel?: string | null;
+  planIsSubscription?: boolean;
+  planMealsPerWeek?: number | null;
+  /** Dishes chosen per week. */
+  mealSelections?: { name: string; quantity: number }[];
   currency: string;
   basePriceCents: number | null;
   deliveryFeeCents: number;
@@ -104,9 +110,27 @@ function fulfilmentSummary(o: OrderEmailData): string {
 }
 
 function planSummary(o: OrderEmailData) {
+  if (o.packageLabel) {
+    const perWeek = o.planMealsPerWeek ? `${o.planMealsPerWeek} meals a week` : null;
+    const billing = o.planIsSubscription
+      ? `Monthly subscription (renews every ${Math.max(1, Math.round(o.planDurationDays / 7))} weeks)`
+      : "One week";
+    return [o.packageLabel, perWeek, billing].filter(Boolean).join(" · ");
+  }
   const parts = [`${o.planName} (${o.planDurationDays} days)`];
   if (o.planMealsIncluded) parts.push(`${o.planMealsIncluded} meals`);
   return parts.join(" · ");
+}
+
+/** "2× Chicken Poke Bowl, 3× Mexican Beef Bowl" (per week). */
+export function dishesSummary(o: Pick<OrderEmailData, "mealSelections">): string | null {
+  if (!o.mealSelections?.length) return null;
+  return o.mealSelections.map((m) => `${m.quantity}× ${m.name}`).join(", ") + " (per week)";
+}
+
+function renewalNote(o: OrderEmailData): string | null {
+  if (!o.planIsSubscription || o.basePriceCents === null) return null;
+  return `${formatMoney(o.basePriceCents, o.currency)} every ${Math.max(1, Math.round(o.planDurationDays / 7))} weeks after the first period`;
 }
 
 // ── Business notification ───────────────────────────────────────────────────
@@ -142,7 +166,8 @@ export function renderBusinessOrderEmail(o: OrderEmailData, brand: EmailBrand, a
       (needsReview && o.basePriceCents !== null
         ? row("Total without promotion", money(o.basePriceCents + o.deliveryFeeCents, o.currency))
         : "") +
-      (o.promotionEndsAt ? row("Campaign ends", formatDateTime(o.promotionEndsAt, brand.timeZone)) : "") +
+      (o.promotionEndsAt ? row("Offer ends", formatDateTime(o.promotionEndsAt, brand.timeZone)) : "") +
+      row("Subscription", renewalNote(o)) +
       row("Payment", "Not collected — arrange with the customer"),
   );
 
@@ -162,7 +187,8 @@ ${table(
 )}
 <h2 style="font-size:15px;margin:20px 0 0;text-transform:uppercase;letter-spacing:1px;">Order</h2>
 ${table(
-  row("Plan", planSummary(o)) +
+  row("Package", planSummary(o)) +
+    row("Dishes", dishesSummary(o)) +
     row("Fulfilment", fulfilmentSummary(o)) +
     row("Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null) +
     row("Meal preference", o.mealPreference) +
@@ -190,7 +216,8 @@ ${pricing}
     ]),
     "\nORDER",
     textLines([
-      ["Plan", planSummary(o)],
+      ["Package", planSummary(o)],
+      ["Dishes", dishesSummary(o)],
       ["Fulfilment", fulfilmentSummary(o)],
       ["Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null],
       ["Meal preference", o.mealPreference],
@@ -208,7 +235,8 @@ ${pricing}
       ],
       ["Delivery fee", o.deliveryFeeCents > 0 ? formatMoney(o.deliveryFeeCents, o.currency) : null],
       [needsReview ? "Quoted total (if eligible)" : "Quoted total", money(o.totalCents, o.currency)],
-      ["Campaign ends", o.promotionEndsAt ? formatDateTime(o.promotionEndsAt, brand.timeZone) : null],
+      ["Offer ends", o.promotionEndsAt ? formatDateTime(o.promotionEndsAt, brand.timeZone) : null],
+      ["Subscription", renewalNote(o)],
       ["Payment", "Not collected"],
     ]),
     `\nOpen in admin: ${adminOrderUrl}`,
@@ -233,7 +261,8 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
     : "";
 
   const pricingRows =
-    row("Plan", planSummary(o)) +
+    row("Package", planSummary(o)) +
+    row("Dishes", dishesSummary(o)) +
     row("Fulfilment", o.fulfillmentMethod === "DELIVERY" ? `Delivery — ${o.deliveryLocality ?? ""}` : FULFILLMENT_LABELS.COLLECTION) +
     row("Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null) +
     row("Plan price", money(o.basePriceCents, o.currency)) +
@@ -241,7 +270,8 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
       ? row(o.promotionRequiresVerification ? "Requested offer" : "Offer", `−${formatMoney(o.discountCents, o.currency)} (${o.promotionName})`)
       : "") +
     (o.deliveryFeeCents > 0 ? row("Delivery fee", formatMoney(o.deliveryFeeCents, o.currency)) : "") +
-    row(o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency));
+    row(o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency)) +
+    row("Then", renewalNote(o));
 
   const contactLines = [
     brand.whatsappLink ? `<a href="${escapeHtml(brand.whatsappLink)}" style="color:#080808;">WhatsApp</a>` : null,
@@ -268,12 +298,14 @@ ${contactLines.length ? `<p style="margin:16px 0 0;">Questions? Reach us via ${c
       : "",
     "",
     textLines([
-      ["Plan", planSummary(o)],
+      ["Package", planSummary(o)],
+      ["Dishes", dishesSummary(o)],
       ["Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null],
       ["Plan price", money(o.basePriceCents, o.currency)],
       ["Offer", o.promotionName && o.discountCents > 0 ? `-${formatMoney(o.discountCents, o.currency)} (${o.promotionName})` : null],
       ["Delivery fee", o.deliveryFeeCents > 0 ? formatMoney(o.deliveryFeeCents, o.currency) : null],
       [o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency)],
+      ["Then", renewalNote(o)],
     ]),
     brand.publicEmail ? `\nQuestions? Email ${brand.publicEmail}` : "",
   ]

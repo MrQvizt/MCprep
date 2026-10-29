@@ -13,9 +13,16 @@
  *   are always "subject to verification" — the quote never depends on the
  *   customer's identity, so it cannot leak whether an email/phone is known.
  * - The discount never exceeds the plan price; delivery fees are not discounted.
+ * - FIRST_WEEK_MEAL_PRICE offers price the first week of a package at a fixed
+ *   amount per meal (e.g. €6): discount = normal first-week price − meals × price.
+ *   Plans that aren't packages (no meals per week) get no discount from them.
+ * - Personal-deadline offers (personalWindowMinutes) are only valid for a
+ *   visitor whose offer window started less than that many minutes ago. The
+ *   window start comes from a signed cookie the server set; without one the
+ *   offer doesn't apply.
  */
 
-export type DiscountTypeValue = "PERCENTAGE" | "FIXED_AMOUNT";
+export type DiscountTypeValue = "PERCENTAGE" | "FIXED_AMOUNT" | "FIRST_WEEK_MEAL_PRICE";
 export type AudienceValue = "ALL_CUSTOMERS" | "NEW_CUSTOMERS" | "SELECTED_CUSTOMERS";
 
 export interface PricingPromotion {
@@ -38,11 +45,47 @@ export interface PricingPromotion {
   totalRedemptionLimit: number | null;
   /** Redemptions counted towards the total limit (requested + approved). */
   redemptionCount: number;
+  /** Minutes the offer stays valid after a visitor first sees it (null = no personal deadline). */
+  personalWindowMinutes?: number | null;
 }
 
 export interface PricingPlan {
   id: string;
   priceCents: number | null;
+  /** Length of one billing period in days (7 = weekly, 28 = monthly). */
+  durationDays?: number | null;
+  /** Packages only: meals per week. */
+  mealsPerWeek?: number | null;
+}
+
+/** Normal price of the first 7 days of a plan (the whole price for plans of a week or less). */
+export function firstWeekPriceCents(plan: Pick<PricingPlan, "priceCents" | "durationDays">): number | null {
+  if (plan.priceCents === null) return null;
+  const days = plan.durationDays ?? 7;
+  if (days <= 7) return plan.priceCents;
+  return Math.round((plan.priceCents * 7) / days);
+}
+
+/** Effective end of an offer for this visitor: the earlier of the offer end and their personal deadline. */
+export function effectiveEndsAt(
+  p: Pick<PricingPromotion, "endsAt" | "personalWindowMinutes">,
+  offerWindowStartedAt: Date | null | undefined,
+): Date | null {
+  if (!p.personalWindowMinutes) return p.endsAt;
+  if (!offerWindowStartedAt) return null;
+  const personal = new Date(offerWindowStartedAt.getTime() + p.personalWindowMinutes * 60_000);
+  return personal.getTime() < p.endsAt.getTime() ? personal : p.endsAt;
+}
+
+/** Whether a personal-deadline offer is still open for this visitor (always true for other offers). */
+export function personalWindowOpen(
+  p: Pick<PricingPromotion, "endsAt" | "personalWindowMinutes">,
+  offerWindowStartedAt: Date | null | undefined,
+  now: Date,
+): boolean {
+  if (!p.personalWindowMinutes) return true;
+  const end = effectiveEndsAt(p, offerWindowStartedAt);
+  return end !== null && now.getTime() < end.getTime();
 }
 
 export type PromotionState = "DRAFT" | "SCHEDULED" | "ACTIVE" | "EXPIRED" | "LIMIT_REACHED";
@@ -63,14 +106,23 @@ export function promotionAppliesToPlan(p: Pick<PricingPromotion, "appliesToAllPl
   return p.appliesToAllPlans || p.planIds.includes(planId);
 }
 
-/** Discount in cents for a base price. Rounds half-up to the nearest cent. */
+/**
+ * Discount in cents for a base price. Rounds half-up to the nearest cent.
+ * First-week meal-price offers need the plan (duration and meals per week).
+ */
 export function calculateDiscount(
   baseCents: number,
   p: Pick<PricingPromotion, "discountType" | "discountValue" | "maxDiscountCents">,
+  plan?: Pick<PricingPlan, "durationDays" | "mealsPerWeek"> | null,
 ): number {
   if (!Number.isInteger(baseCents) || baseCents <= 0) return 0;
   let discount: number;
-  if (p.discountType === "PERCENTAGE") {
+  if (p.discountType === "FIRST_WEEK_MEAL_PRICE") {
+    const meals = plan?.mealsPerWeek ?? 0;
+    if (!Number.isInteger(meals) || meals <= 0) return 0;
+    const firstWeek = firstWeekPriceCents({ priceCents: baseCents, durationDays: plan?.durationDays ?? 7 }) ?? 0;
+    discount = Math.max(0, firstWeek - meals * Math.max(p.discountValue, 0));
+  } else if (p.discountType === "PERCENTAGE") {
     const bps = Math.min(Math.max(p.discountValue, 0), 10000);
     // Integer arithmetic: floor((base * bps + 5000) / 10000) == round half-up.
     discount = Math.floor((baseCents * bps + 5000) / 10000);
@@ -137,6 +189,8 @@ export interface QuoteInput {
   couponCode?: string | null;
   firstOrderDeclared?: boolean;
   deliveryFeeCents?: number | null;
+  /** When this visitor's personal offer window started (verified signed cookie), if ever. */
+  offerWindowStartedAt?: Date | null;
 }
 
 function better(a: { discount: number; p: PricingPromotion }, b: { discount: number; p: PricingPromotion }) {
@@ -145,7 +199,7 @@ function better(a: { discount: number; p: PricingPromotion }, b: { discount: num
   return a.p.endsAt.getTime() <= b.p.endsAt.getTime() ? a : b;
 }
 
-function toApplied(p: PricingPromotion, discountCents: number): AppliedPromotion {
+function toApplied(p: PricingPromotion, discountCents: number, endsAt: Date): AppliedPromotion {
   return {
     id: p.id,
     name: p.name,
@@ -155,7 +209,7 @@ function toApplied(p: PricingPromotion, discountCents: number): AppliedPromotion
     discountValue: p.discountValue,
     audience: p.audience,
     code: p.requiresCode ? p.code : null,
-    endsAt: p.endsAt,
+    endsAt,
     discountCents,
   };
 }
@@ -166,6 +220,8 @@ export function computeQuote(input: QuoteInput): Quote {
   const deliveryFeeCents = Math.max(0, input.deliveryFeeCents ?? 0);
   const base = plan.priceCents;
   const coupon = normalizeCode(input.couponCode);
+  const windowStart = input.offerWindowStartedAt ?? null;
+  const endsFor = (p: PricingPromotion) => effectiveEndsAt(p, windowStart) ?? p.endsAt;
 
   const empty: Quote = {
     basePriceCents: base,
@@ -189,10 +245,11 @@ export function computeQuote(input: QuoteInput): Quote {
       else if (state === "SCHEDULED") couponStatus = "NOT_STARTED";
       else if (state === "EXPIRED") couponStatus = "EXPIRED";
       else if (state === "LIMIT_REACHED") couponStatus = "LIMIT_REACHED";
+      else if (!personalWindowOpen(match, windowStart, now)) couponStatus = "EXPIRED";
       else if (!promotionAppliesToPlan(match, plan.id)) couponStatus = "NOT_ELIGIBLE_PLAN";
       else if (match.audience === "NEW_CUSTOMERS" && !declared) couponStatus = "DECLARATION_REQUIRED";
       else if (base !== null) {
-        couponCandidate = { discount: calculateDiscount(base, match), p: match };
+        couponCandidate = { discount: calculateDiscount(base, match, plan), p: match };
         couponStatus = "APPLIED";
       } else {
         couponStatus = "APPLIED";
@@ -210,11 +267,12 @@ export function computeQuote(input: QuoteInput): Quote {
   for (const p of promotions) {
     if (p.requiresCode || p.audience === "SELECTED_CUSTOMERS") continue;
     if (!isPromotionLive(p, now) || !promotionAppliesToPlan(p, plan.id)) continue;
-    const discount = calculateDiscount(base, p);
+    if (!personalWindowOpen(p, windowStart, now)) continue;
+    const discount = calculateDiscount(base, p, plan);
     if (discount <= 0) continue;
     if (p.audience === "NEW_CUSTOMERS" && !declared) {
       if (!firstOrderOffer || discount > firstOrderOffer.discountCents) {
-        firstOrderOffer = { id: p.id, name: p.name, discountCents: discount, endsAt: p.endsAt };
+        firstOrderOffer = { id: p.id, name: p.name, discountCents: discount, endsAt: endsFor(p) };
       }
       continue;
     }
@@ -241,7 +299,7 @@ export function computeQuote(input: QuoteInput): Quote {
     discountCents,
     deliveryFeeCents,
     totalCents: base - discountCents + deliveryFeeCents,
-    promotion: toApplied(winner.p, discountCents),
+    promotion: toApplied(winner.p, discountCents, endsFor(winner.p)),
     requiresVerification: winner.p.audience !== "ALL_CUSTOMERS",
     couponStatus,
     availableFirstOrderOffer: firstOrderOffer,
@@ -260,8 +318,16 @@ export const COUPON_MESSAGES: Record<CouponStatus, string> = {
   DECLARATION_REQUIRED: "This code is for first orders. Please confirm this is your first order to request it.",
 };
 
-/** Human label: "20% off" / "€10 off" */
+/** Human label: "20% off" / "€10 off" / "First week €6/meal" */
 export function discountLabel(p: Pick<PricingPromotion, "discountType" | "discountValue">, currency = "EUR"): string {
+  if (p.discountType === "FIRST_WEEK_MEAL_PRICE") {
+    const amount = new Intl.NumberFormat("en-MT", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: p.discountValue % 100 === 0 ? 0 : 2,
+    }).format(p.discountValue / 100);
+    return `First week ${amount}/meal`;
+  }
   if (p.discountType === "PERCENTAGE") {
     const pct = p.discountValue / 100;
     return `${Number.isInteger(pct) ? pct : pct.toFixed(2).replace(/0$/, "")}% off`;
