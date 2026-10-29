@@ -60,7 +60,7 @@ Returning customers can always order at the normal price.
 
 - mark someone as an **existing customer** (e.g. they ordered via Instagram before the website existed) so they
   don't get first-order offers, or as a **first-time customer** to override the automatic check;
-- **export** a customer's data if they ask for a copy, or **anonymise** them if they ask to be deleted
+- **export** a customer's data if they ask for a copy, or use **Remove personal data** if they ask to be deleted
   (prices are kept for your accounts; names, contact details, addresses and allergies are removed).
 
 ---
@@ -101,9 +101,9 @@ You can add new plans or switch a plan off (**Active**). Plans that already have
 3. Set the **discount** (e.g. 20%, or a fixed amount like €10) and, if you like, a **maximum discount**.
 4. Choose **who can use it**: *New customers only* for a first-order offer.
 5. Choose the **plans** it applies to (or all plans).
-6. Set the **start** and **end** time (Malta time). For a 72-hour flash sale, use the **"72 hours from now"** button.
-7. Keep **Show countdown** and **Show on homepage** ticked.
-8. Tick **Enabled** and save. Use the **preview** on the page to see exactly what customers will see.
+6. Set the **start** and **end** time (Malta time). For a 72-hour flash sale, use **"Start now, run for 72 hours"**; to finish at midnight use **"End at 23:59 on"** a chosen date.
+7. Keep **Show the countdown timer** and **Show the banner on the homepage** ticked.
+8. Tick **Enable this campaign** and save. Use the **preview** on the page to see exactly what customers will see.
 
 The countdown counts down to the real end time — it never resets. When it ends, the discount stops automatically,
 the banner disappears (or shows an "offer ended" message if you chose that), and new orders are priced normally.
@@ -117,7 +117,7 @@ stories or ads. These pages are hidden from Google by default (they are temporar
 2. Rename it (e.g. "Black Friday 2026"), pick the theme, update the headline, discount and dates.
 3. Enable it when you're ready — or set it now with a future start date; it switches on by itself at the start time.
 
-Coupon codes: tick **Code required** and set a code (e.g. FUEL10) to make an offer that only works with the code.
+Coupon codes: tick **Customers must enter a code** and set a code (e.g. FUEL10) to make an offer that only works with the code.
 "Selected customers" offers always need a code.
 
 ---
@@ -129,7 +129,7 @@ Collection & delivery, the final call to action, the About page, the four Malta 
 pages. Click one, edit the fields, save. **Section visibility** lets you hide homepage sections.
 
 Legal pages (privacy, terms, cookies) are templates — have them reviewed, edit everything in [square brackets],
-then tick **Reviewed by owner**.
+then tick **"I have reviewed this page"**.
 
 ---
 
