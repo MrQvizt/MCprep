@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { afterAll, beforeEach, vi } from "vitest";
 
 // Point the app's Prisma client at the disposable test database.
@@ -7,6 +8,7 @@ process.env.UPLOAD_DIR = "./storage/test-uploads";
 process.env.EMAIL_TRANSPORT = "disabled";
 process.env.NEXT_PUBLIC_SITE_URL = "https://mcpreps.test";
 process.env.HASH_SALT = "test-salt";
+process.env.AUTH_SECRET ??= "test-auth-secret-for-integration-tests-only";
 
 // Next.js request-scoped APIs are not available outside a request.
 vi.mock("next/server", async (importOriginal) => {

@@ -122,7 +122,7 @@ export const orderFormSettingsSchema = z.object({
     "No payment is required now. Once you submit your order, our team will contact you to confirm availability, delivery details, and payment arrangements.",
   ),
   allergenNotice: str(
-    "Our meals are prepared in a kitchen that handles common allergens. If you have an allergy or intolerance, tell us below and we'll confirm what's suitable before your order is confirmed. Allergy details are kept private and used only to prepare your order safely.",
+    "If you have an allergy or intolerance, tell us below and we'll confirm what's suitable before your order is confirmed. Allergy details are kept private and used only to prepare your order safely.",
   ),
 });
 
