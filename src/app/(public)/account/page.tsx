@@ -19,6 +19,7 @@ import { requestNow } from "@/lib/public-data";
 import { getSettings } from "@/lib/settings";
 import { formatCalendarDate, formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { whatsappLink } from "@/lib/whatsapp";
 import { signOutAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -167,7 +168,16 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         ) : (
           <ul className="mt-5 space-y-3">
             {orders.map((o) => (
-              <OrderRow key={o.id} order={o} tz={tz} />
+              <OrderRow
+                key={o.id}
+                order={o}
+                tz={tz}
+                whatsappHref={
+                  settings.contact.whatsappEnabled
+                    ? whatsappLink(settings.contact.whatsappNumber, `Hi ${settings.business.tradingName}! A question about my order ${o.reference}.`)
+                    : null
+                }
+              />
             ))}
           </ul>
         )}
@@ -176,7 +186,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   );
 }
 
-function OrderRow({ order: o, tz }: { order: AccountOrder; tz: string }) {
+function OrderRow({ order: o, tz, whatsappHref }: { order: AccountOrder; tz: string; whatsappHref: string | null }) {
   const status = o.status as OrderStatusValue;
   const total = o.confirmedTotalCents ?? o.totalCents;
   const paid = o.paymentStatus === "PAID";
@@ -214,7 +224,17 @@ function OrderRow({ order: o, tz }: { order: AccountOrder; tz: string }) {
           {o.mealSelections.length > 0 && (
             <p className="mt-2 text-sm text-white/80">{o.mealSelections.map((m) => `${m.quantity}× ${m.mealName}`).join(" · ")}</p>
           )}
-          <p className="mt-3 text-xs text-fog">{CUSTOMER_ORDER_STATUS_HINTS[status]}</p>
+          <p className="mt-3 text-xs text-fog">
+            {CUSTOMER_ORDER_STATUS_HINTS[status]}
+            {whatsappHref && o.status !== "CANCELLED" && (
+              <>
+                {" "}
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="text-white underline underline-offset-4">
+                  Message us about this order
+                </a>
+              </>
+            )}
+          </p>
         </div>
         <div className="flex w-full flex-wrap items-end justify-between gap-3 border-t border-white/10 pt-4 sm:block sm:w-auto sm:border-0 sm:pt-0 sm:text-right">
           <div>

@@ -115,7 +115,8 @@ test.describe("customer account", () => {
     await other.getByRole("button", { name: "Delete my account" }).click();
     await other.getByLabel("Confirm with your password").fill("Another-password-9");
     await other.getByRole("button", { name: "Delete account" }).click();
-    await expect(other).toHaveURL(/\/\?account=deleted/, { timeout: 20_000 });
+    await expect(other).toHaveURL(/\/account\/deleted/, { timeout: 20_000 });
+    await expect(other.getByRole("heading", { level: 1 })).toHaveText("Your account is deleted");
     await other.goto("/account");
     await expect(other).toHaveURL(/\/account\/sign-in/);
 

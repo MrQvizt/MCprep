@@ -185,7 +185,7 @@ export async function deleteAccountAction(_prev: ActionState, fd: FormData): Pro
   } catch (error) {
     return accountError(error);
   }
-  redirect("/?account=deleted");
+  redirect("/account/deleted");
 }
 
 /** Save an order to the signed-in account using its private confirmation link. */
