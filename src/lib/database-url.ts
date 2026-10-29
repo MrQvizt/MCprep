@@ -48,6 +48,30 @@ export function databaseEnvNames(env: Env = process.env): string[] {
 }
 
 /**
+ * Supabase's shared pooler (`*.pooler.supabase.com`) runs two modes:
+ *   port 5432 — session mode: every client holds a database connection for as
+ *               long as it stays connected (only ~15 on small plans);
+ *   port 6543 — transaction mode: clients share connections per transaction.
+ * Serverless functions open many short-lived clients, which exhausts session
+ * mode ("max clients reached in session mode"), so the app uses transaction
+ * mode at runtime. Migrations keep using the URL exactly as given.
+ * Set DATABASE_POOLER_MODE=session to opt out.
+ */
+export function preferTransactionPooler(url: string, env: Env = process.env): string {
+  if (clean(env.DATABASE_POOLER_MODE)?.toLowerCase() === "session") return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (!parsed.hostname.endsWith(".pooler.supabase.com")) return url;
+  if (parsed.port !== "" && parsed.port !== "5432") return url;
+  parsed.port = "6543";
+  return parsed.toString();
+}
+
+/**
  * node-postgres treats `sslmode=require` as full certificate verification,
  * which rejects Supabase's own certificate authority. `uselibpqcompat=true`
  * restores the standard PostgreSQL meaning (encrypted connection). Explicit

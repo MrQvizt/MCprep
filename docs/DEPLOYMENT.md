@@ -34,6 +34,12 @@ Add these variables in Vercel → Settings → Environment Variables, then redep
 | `RESEND_API_KEY`, `EMAIL_FROM` | order emails (they wait in the queue until configured) |
 | `STORAGE_DRIVER=s3` + `S3_*` + `MEDIA_PUBLIC_BASE_URL` | photo uploads (Supabase Storage's S3 endpoint, Cloudflare R2 or AWS S3) |
 
+**Using a Supabase connection string directly** (instead of the integration): set `DATABASE_URL` to the
+**Session pooler** string (`…pooler.supabase.com:5432/postgres?sslmode=require`). Migrations use it as given; the
+app automatically switches to Supabase's transaction pooler (port 6543), which is built for serverless functions —
+session mode only allows ~15 simultaneous connections and runs out quickly. Functions run in Dublin (`dub1`, set in
+`vercel.json`), next to Supabase's `eu-west-1` region; change both together if your database lives elsewhere.
+
 Preview deployments use the same database unless you give them their own, so test on previews with care.
 Set `SKIP_DB_MIGRATIONS=1` on an environment to stop automatic migrations there.
 
