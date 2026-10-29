@@ -258,3 +258,59 @@ describe("order filters and CSV export", () => {
     expect(await db.auditLog.count({ where: { action: "order.export" } })).toBe(1);
   });
 });
+
+describe("manual payments and work queues", () => {
+  it("marks an order paid with the method and amount, and can undo it", async () => {
+    await signInAs("ADMIN");
+    const order = await createTestOrder({ status: "CONFIRMED", totalCents: 6000 });
+    const { quickMarkPaid, quickMarkUnpaid } = await import("@/app/admin/(dashboard)/orders/actions");
+
+    expect((await quickMarkPaid(order.id, "REVOLUT")).ok).toBe(true);
+    let saved = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(saved).toMatchObject({ paymentStatus: "PAID", paymentProvider: "REVOLUT", paidAmountCents: 6000 });
+    expect(saved.paidAt).toBeInstanceOf(Date);
+    expect(await db.auditLog.count({ where: { action: "order.paid", entityId: order.id } })).toBe(1);
+
+    expect((await quickMarkUnpaid(order.id)).ok).toBe(true);
+    saved = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(saved).toMatchObject({ paymentStatus: "NOT_COLLECTED", paymentProvider: null, paidAmountCents: null, paidAt: null });
+  });
+
+  it("uses the agreed price when there is one, and refuses cancelled orders", async () => {
+    await signInAs("ADMIN");
+    const { quickMarkPaid } = await import("@/app/admin/(dashboard)/orders/actions");
+    const agreed = await createTestOrder({ status: "CONFIRMED", totalCents: 9500 });
+    await db.order.update({ where: { id: agreed.id }, data: { confirmedTotalCents: 8000 } });
+    await quickMarkPaid(agreed.id, "CASH");
+    expect((await db.order.findUniqueOrThrow({ where: { id: agreed.id } })).paidAmountCents).toBe(8000);
+
+    const cancelled = await createTestOrder({ status: "CANCELLED" });
+    const res = await quickMarkPaid(cancelled.id, "CASH");
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/cancelled/);
+  });
+
+  it("only lets order managers record payments", async () => {
+    const order = await createTestOrder({ status: "CONFIRMED" });
+    const { quickMarkPaid } = await import("@/app/admin/(dashboard)/orders/actions");
+    signOutTest();
+    expect((await quickMarkPaid(order.id, "CASH")).ok).toBe(false);
+    await signInAs("EDITOR");
+    expect((await quickMarkPaid(order.id, "CASH")).ok).toBe(false);
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("NOT_COLLECTED");
+  });
+
+  it("lists orders to confirm and confirmed orders that aren't paid", async () => {
+    const fresh = await createTestOrder({ status: "NEW" });
+    const waiting = await createTestOrder({ status: "CONTACTED" });
+    const confirmedUnpaid = await createTestOrder({ status: "CONFIRMED" });
+    const completedPaid = await createTestOrder({ status: "COMPLETED" });
+    await db.order.update({ where: { id: completedPaid.id }, data: { paymentStatus: "PAID" } });
+    await createTestOrder({ status: "CANCELLED" });
+
+    const ids = async (queue: string) =>
+      (await db.order.findMany({ where: buildOrderWhere(parseOrderFilters({ queue })), select: { id: true } })).map((o) => o.id).sort();
+    expect(await ids("to_confirm")).toEqual([fresh.id, waiting.id].sort());
+    expect(await ids("unpaid")).toEqual([confirmedUnpaid.id]);
+  });
+});

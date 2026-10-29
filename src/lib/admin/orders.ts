@@ -1,7 +1,8 @@
 import "server-only";
 import { logAudit, type AuditActor } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { ORDER_STATUSES, ORDER_STATUS_LABELS, type OrderStatusValue } from "@/lib/orders/labels";
+import { formatMoney } from "@/lib/money";
+import { ORDER_STATUSES, ORDER_STATUS_LABELS, PAYMENT_METHODS, type OrderStatusValue, type PaymentMethod } from "@/lib/orders/labels";
 import { addDaysToDateString, DEFAULT_TIME_ZONE, zonedLocalToUtc } from "@/lib/time";
 import type { EligibilityStatus, OrderStatus, PaymentStatus, Prisma } from "@/generated/prisma/client";
 
@@ -25,7 +26,16 @@ export type EligibilityFilter = keyof typeof ELIGIBILITY_FILTERS;
 /** Eligibility states that still wait for a human decision. */
 export const UNDECIDED_ELIGIBILITY: EligibilityStatus[] = ["PRELIMINARY_ELIGIBLE", "NEEDS_REVIEW", "LIKELY_INELIGIBLE"];
 
+/** Work queues: orders waiting for a confirmation, or confirmed but not paid yet. */
+export const ORDER_QUEUES = {
+  to_confirm: "To confirm",
+  unpaid: "Unpaid",
+} as const;
+export type OrderQueue = keyof typeof ORDER_QUEUES;
+const GOING_AHEAD: OrderStatus[] = ["CONFIRMED", "IN_PREPARATION", "COMPLETED"];
+
 export interface OrderFilters {
+  queue: OrderQueue | "";
   q: string;
   status: OrderStatusValue | "";
   eligibility: EligibilityFilter | "";
@@ -57,7 +67,9 @@ export function parseOrderFilters(sp: SearchParamsLike): OrderFilters {
   const promotion = pick(sp, "promotion");
   const customer = pick(sp, "customer");
   const page = Math.max(1, Math.min(10_000, parseInt(pick(sp, "page"), 10) || 1));
+  const queue = pick(sp, "queue");
   return {
+    queue: queue in ORDER_QUEUES ? (queue as OrderQueue) : "",
     q: pick(sp, "q").slice(0, 120),
     status: (ORDER_STATUSES as readonly string[]).includes(status) ? (status as OrderStatusValue) : "",
     eligibility: eligibility in ELIGIBILITY_FILTERS ? (eligibility as EligibilityFilter) : "",
@@ -74,7 +86,7 @@ export function parseOrderFilters(sp: SearchParamsLike): OrderFilters {
 export function orderFiltersToQuery(f: OrderFilters, overrides: Partial<OrderFilters> = {}): string {
   const merged = { ...f, ...overrides };
   const params = new URLSearchParams();
-  for (const key of ["q", "status", "eligibility", "fulfillment", "from", "to", "promotion", "customer"] as const) {
+  for (const key of ["queue", "q", "status", "eligibility", "fulfillment", "from", "to", "promotion", "customer"] as const) {
     if (merged[key]) params.set(key, String(merged[key]));
   }
   if (merged.page > 1) params.set("page", String(merged.page));
@@ -82,7 +94,7 @@ export function orderFiltersToQuery(f: OrderFilters, overrides: Partial<OrderFil
 }
 
 export function hasActiveFilters(f: OrderFilters): boolean {
-  return Boolean(f.q || f.status || f.eligibility || f.fulfillment || f.from || f.to || f.promotion || f.customer);
+  return Boolean(f.queue || f.q || f.status || f.eligibility || f.fulfillment || f.from || f.to || f.promotion || f.customer);
 }
 
 export function buildOrderWhere(f: OrderFilters, timeZone: string = DEFAULT_TIME_ZONE): Prisma.OrderWhereInput {
@@ -101,6 +113,8 @@ export function buildOrderWhere(f: OrderFilters, timeZone: string = DEFAULT_TIME
     and.push({ OR: or });
   }
   if (f.status) and.push({ status: f.status as OrderStatus });
+  if (f.queue === "to_confirm") and.push({ status: { in: ["NEW", "CONTACTED"] } });
+  if (f.queue === "unpaid") and.push({ status: { in: GOING_AHEAD }, paymentStatus: { not: "PAID" } });
   if (f.fulfillment) and.push({ fulfillmentMethod: f.fulfillment });
   if (f.promotion) and.push({ promotionId: f.promotion });
   if (f.customer) and.push({ customerId: f.customer });
@@ -137,6 +151,8 @@ const LIST_SELECT = {
   confirmedTotalCents: true,
   promotionName: true,
   eligibilityStatus: true,
+  paymentStatus: true,
+  paymentProvider: true,
   fulfillmentMethod: true,
   deliveryLocality: true,
   isReturningCustomer: true,
@@ -315,6 +331,48 @@ export async function updateOrderPricePayment(input: {
   });
 }
 
+/** One click: record a manual payment (method, amount = agreed or quoted total). */
+export async function markOrderPaid(input: { orderId: string; method: PaymentMethod; actor: AuditActor; now?: Date }) {
+  const now = input.now ?? new Date();
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: { reference: true, status: true, paymentStatus: true, paidAt: true, paidAmountCents: true, confirmedTotalCents: true, totalCents: true, currency: true },
+  });
+  if (!order) throw new OrderActionError("This order no longer exists.");
+  if (order.status === "CANCELLED") throw new OrderActionError("This order is cancelled — re-open it before recording a payment.");
+  const amount = order.paidAmountCents ?? order.confirmedTotalCents ?? order.totalCents;
+  await db.order.update({
+    where: { id: input.orderId },
+    data: { paymentStatus: "PAID", paidAt: order.paidAt ?? now, paidAmountCents: amount, paymentProvider: input.method },
+  });
+  await logAudit({
+    actor: input.actor,
+    action: "order.paid",
+    entityType: "Order",
+    entityId: input.orderId,
+    summary: `Marked ${order.reference} as paid (${PAYMENT_METHODS[input.method]}${amount !== null ? `, ${formatMoney(amount, order.currency)}` : ""})`,
+    changes: { paymentStatus: { from: order.paymentStatus, to: "PAID" } },
+  });
+}
+
+/** Undo a recorded payment. */
+export async function markOrderUnpaid(input: { orderId: string; actor: AuditActor }) {
+  const order = await db.order.findUnique({ where: { id: input.orderId }, select: { reference: true, paymentStatus: true } });
+  if (!order) throw new OrderActionError("This order no longer exists.");
+  await db.order.update({
+    where: { id: input.orderId },
+    data: { paymentStatus: "NOT_COLLECTED", paidAt: null, paidAmountCents: null, paymentProvider: null },
+  });
+  await logAudit({
+    actor: input.actor,
+    action: "order.unpaid",
+    entityType: "Order",
+    entityId: input.orderId,
+    summary: `Marked ${order.reference} as not paid`,
+    changes: { paymentStatus: { from: order.paymentStatus, to: "NOT_COLLECTED" } },
+  });
+}
+
 // ── Promotion eligibility decisions ─────────────────────────────────────────
 
 export async function decideOrderEligibility(input: {
@@ -478,4 +536,13 @@ export async function getCustomerHistorySummary(order: { id: string; customerId:
 
 export function isOrderStatus(value: string): value is OrderStatus {
   return (ORDER_STATUSES as readonly string[]).includes(value);
+}
+
+/** Counts for the work queues (orders list tabs and dashboard). */
+export async function orderQueueCounts() {
+  const [toConfirm, unpaid] = await Promise.all([
+    db.order.count({ where: { status: { in: ["NEW", "CONTACTED"] } } }),
+    db.order.count({ where: { status: { in: GOING_AHEAD }, paymentStatus: { not: "PAID" } } }),
+  ]);
+  return { to_confirm: toConfirm, unpaid };
 }

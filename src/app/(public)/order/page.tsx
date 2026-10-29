@@ -2,6 +2,8 @@ import { Breadcrumbs } from "@/components/public/breadcrumbs";
 import { CtaLink } from "@/components/public/cta-link";
 import { env } from "@/lib/env";
 import { getOfferWindowStart } from "@/lib/offer-window-server";
+import { earliestStartDate, formatTime12, nextCutoff } from "@/lib/order-cutoff";
+import { cutoffConfig } from "@/lib/order-cutoff-settings";
 import { FIRST_ORDER_DECLARATION } from "@/lib/orders/schema";
 import { quoteForOrder } from "@/lib/orders/service";
 import { evenSplit, isPackage, type MealChoice } from "@/lib/packages";
@@ -117,6 +119,9 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
     : null;
 
   const today = zonedDateString(now, settings.business.timeZone);
+  const tz = settings.business.timeZone;
+  const f = settings.fulfillment;
+  const cutoff = f.weeklyCutoffEnabled ? nextCutoff(now, cutoffConfig(f), tz) : null;
   const toOption = (p: (typeof plans)[number]) => ({
     slug: p.slug,
     name: p.name,
@@ -186,7 +191,16 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
       allergenNotice: settings.orderForm.allergenNotice,
     },
     declarationText: FIRST_ORDER_DECLARATION(brandName),
-    minStartDate: addDaysToDateString(today, settings.fulfillment.leadTimeDays),
+    minStartDate: earliestStartDate(now, cutoffConfig(f), f.leadTimeDays, tz),
+    cutoff: cutoff
+      ? {
+          cutoff: cutoff.cutoff.toISOString(),
+          cutoffDay: cutoff.cutoffDay,
+          weekStart: cutoff.weekStart,
+          timeLabel: formatTime12(f.weeklyCutoffTime),
+          serverNow: now.toISOString(),
+        }
+      : null,
     maxStartDate: addDaysToDateString(today, 365),
     whatsappHref: wa,
     turnstileSiteKey: env().TURNSTILE_SITE_KEY ?? null,

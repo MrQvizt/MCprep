@@ -100,6 +100,22 @@ describe("order creation", () => {
     await expectValidation(submit({ preferredStartDate: "2020-01-01" }), "preferredStartDate");
   });
 
+  it("only accepts start dates from the week after the Wednesday 4pm deadline", async () => {
+    await createPlan({ slug: "2-weeks" });
+    const monday = new Date("2026-11-02T09:00:00Z"); // Monday 10:00 Malta → next deadline Wed 4 Nov 4pm
+    const early = await createOrderRequest(input({ preferredStartDate: "2026-11-05" }), { now: monday }).catch((e: unknown) => e);
+    expect(early).toBeInstanceOf(OrderValidationError);
+    expect((early as OrderValidationError).fieldErrors.preferredStartDate).toMatch(/9 November.*Wednesday.*4pm/);
+    const ok = await createOrderRequest(input({ preferredStartDate: "2026-11-09" }), { now: monday });
+    expect(ok.reference).toMatch(/^MCP-/);
+    // After the deadline, the following week is the earliest.
+    const friday = new Date("2026-11-06T09:00:00Z");
+    const late = await createOrderRequest(input({ email: "late@example.com", phone: "7999 0000", preferredStartDate: "2026-11-09" }), {
+      now: friday,
+    }).catch((e: unknown) => e);
+    expect((late as OrderValidationError).fieldErrors.preferredStartDate).toMatch(/16 November/);
+  });
+
   it("requires allergy consent when allergies are given", () => {
     expect(() => input({ allergies: "Gluten", allergyConsent: false })).toThrow();
   });

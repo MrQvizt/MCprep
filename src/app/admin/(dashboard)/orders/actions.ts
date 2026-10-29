@@ -8,6 +8,8 @@ import {
   changeOrderStatus,
   decideOrderEligibility,
   isOrderStatus,
+  markOrderPaid,
+  markOrderUnpaid,
   OrderActionError,
   PAYMENT_STATUSES,
   updateOrderPricePayment,
@@ -16,7 +18,7 @@ import { AREA_ROLES, assertAdmin } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { processOutbox, requeueEmail } from "@/lib/email/outbox";
 import { parseMoneyToCents } from "@/lib/money";
-import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
+import { ORDER_STATUS_LABELS, PAYMENT_METHODS, type PaymentMethod } from "@/lib/orders/labels";
 import type { OrderStatus } from "@/generated/prisma/client";
 
 function refresh(orderId: string) {
@@ -38,6 +40,31 @@ export async function quickOrderStatus(orderId: string, toStatus: OrderStatus): 
     await changeOrderStatus({ orderId, toStatus, actor: admin });
     refresh(orderId);
     return ok(`Marked as “${ORDER_STATUS_LABELS[toStatus]}”`);
+  } catch (error) {
+    return orderError(error);
+  }
+}
+
+/** One click: record that the customer paid, and how. */
+export async function quickMarkPaid(orderId: string, method: PaymentMethod): Promise<ActionState> {
+  try {
+    const admin = await assertAdmin(AREA_ROLES.orders);
+    if (!(method in PAYMENT_METHODS)) return fail("Choose how the customer paid.");
+    await markOrderPaid({ orderId, method, actor: admin });
+    refresh(orderId);
+    return ok(`Marked as paid (${PAYMENT_METHODS[method]})`);
+  } catch (error) {
+    return orderError(error);
+  }
+}
+
+/** Undo a recorded payment. */
+export async function quickMarkUnpaid(orderId: string): Promise<ActionState> {
+  try {
+    const admin = await assertAdmin(AREA_ROLES.orders);
+    await markOrderUnpaid({ orderId, actor: admin });
+    refresh(orderId);
+    return ok("Marked as not paid");
   } catch (error) {
     return orderError(error);
   }

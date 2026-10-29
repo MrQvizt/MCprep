@@ -16,6 +16,7 @@ import { formatCalendarDate, formatWeekdays } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { startOfferWindowAction } from "../offer-actions";
 import { getQuoteAction, submitOrderAction, type QuoteView } from "./actions";
+import { OrderCutoffCard, type OrderCutoffProps } from "@/components/public/order-cutoff-notice";
 import { DishPicker, type DishOption } from "./dish-picker";
 import { PackageBuilder } from "./package-builder";
 
@@ -105,6 +106,8 @@ export interface OrderFormProps {
   declarationText: string;
   minStartDate: string;
   maxStartDate: string;
+  /** Weekly ordering deadline ("order before Wednesday 4pm for next week"). */
+  cutoff: OrderCutoffProps | null;
   whatsappHref: string | null;
   turnstileSiteKey: string | null;
 }
@@ -504,6 +507,8 @@ export function OrderForm(props: OrderFormProps) {
       )}
 
       <div className="space-y-14 lg:col-span-7">
+        {props.cutoff && <OrderCutoffCard {...props.cutoff} />}
+
         {props.intro && introDeadline && (
           <IntroOfferCard
             intro={props.intro}
@@ -812,7 +817,7 @@ export function OrderForm(props: OrderFormProps) {
                 optional
                 htmlFor={fid("preferredStartDate")}
                 error={err("preferredStartDate")}
-                hint={`Earliest: ${formatCalendarDate(props.minStartDate)}. We'll confirm the exact date with you.`}
+                hint={`Earliest: ${formatCalendarDate(props.minStartDate)}${props.cutoff ? ` (orders close ${props.cutoff.timeLabel} on the Wednesday before each week)` : ""}. We'll confirm the exact date with you.`}
               >
                 <input
                   id={fid("preferredStartDate")}

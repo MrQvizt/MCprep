@@ -2,12 +2,14 @@ import Link from "next/link";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { OfferBar, type OfferBarPromo } from "@/components/public/offer-bar";
+import { OrderCutoffBar } from "@/components/public/order-cutoff-notice";
 import { ThirdPartyScripts } from "@/components/analytics/third-party-scripts";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader, type NavItem } from "@/components/public/site-header";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { getContent } from "@/lib/content";
 import { getOfferWindowStart } from "@/lib/offer-window-server";
+import { formatTime12, nextCutoff } from "@/lib/order-cutoff";
 import { discountShortLabel } from "@/lib/promotions/format";
 import { getBrandAssets, requestNow } from "@/lib/public-data";
 import { getLivePublicPromotions } from "@/lib/promotions";
@@ -43,6 +45,11 @@ export default async function PublicLayout({ children }: { children: React.React
           newCustomersOnly: personal.audience === "NEW_CUSTOMERS",
         }
       : null;
+  const f = settings.fulfillment;
+  const cutoff = f.weeklyCutoffEnabled
+    ? nextCutoff(now, { weekday: f.weeklyCutoffDay, time: f.weeklyCutoffTime }, settings.business.timeZone)
+    : null;
+
   const c = settings.contact;
   const wa = c.whatsappEnabled ? whatsappLink(c.whatsappNumber, c.whatsappDefaultMessage) : null;
   const waPlain = whatsappLink(c.whatsappNumber, c.whatsappDefaultMessage);
@@ -93,6 +100,15 @@ export default async function PublicLayout({ children }: { children: React.React
           </div>
         )}
         {offerBar && <OfferBar promo={offerBar} startedAt={windowStart?.toISOString() ?? null} serverNow={now.toISOString()} />}
+        {cutoff && (
+          <OrderCutoffBar
+            cutoff={cutoff.cutoff.toISOString()}
+            cutoffDay={cutoff.cutoffDay}
+            weekStart={cutoff.weekStart}
+            timeLabel={formatTime12(f.weeklyCutoffTime)}
+            serverNow={now.toISOString()}
+          />
+        )}
         <SiteHeader
           brand={{ logoText: brand.logoText, logo: brand.logo }}
           nav={nav}

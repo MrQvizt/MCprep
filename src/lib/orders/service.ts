@@ -9,7 +9,9 @@ import { mealSelectionProblem, mealsPerWeek as packageMealsPerWeek, packageLabel
 import { computeQuote, COUPON_MESSAGES, type Quote } from "@/lib/pricing";
 import { getPricingPromotions } from "@/lib/promotions";
 import { getSettings, type AllSettings } from "@/lib/settings";
-import { addDaysToDateString, zonedDateString } from "@/lib/time";
+import { cutoffConfig } from "@/lib/order-cutoff-settings";
+import { earliestStartDate, formatTime12, WEEKDAY_NAMES } from "@/lib/order-cutoff";
+import { addDaysToDateString, formatCalendarDate, zonedDateString } from "@/lib/time";
 import { whatsappLink } from "@/lib/whatsapp";
 import type { Prisma } from "@/generated/prisma/client";
 import { classifyEligibility, needsManualVerification, type CustomerHistory } from "./eligibility";
@@ -258,9 +260,13 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
   // Preferred start date (Malta calendar)
   if (input.preferredStartDate) {
     const today = zonedDateString(now, settings.business.timeZone);
-    const earliest = addDaysToDateString(today, f.leadTimeDays);
+    const earliest = earliestStartDate(now, cutoffConfig(f), f.leadTimeDays, settings.business.timeZone);
     const latest = addDaysToDateString(today, 365);
-    if (input.preferredStartDate < earliest) errors.preferredStartDate = "Please choose a later start date.";
+    if (input.preferredStartDate < earliest) {
+      errors.preferredStartDate = f.weeklyCutoffEnabled
+        ? `The earliest start is ${formatCalendarDate(earliest)} — orders for a week close the ${WEEKDAY_NAMES[f.weeklyCutoffDay]} before at ${formatTime12(f.weeklyCutoffTime)}.`
+        : "Please choose a later start date.";
+    }
     else if (input.preferredStartDate > latest) errors.preferredStartDate = "Please choose a date within the next year.";
   }
 

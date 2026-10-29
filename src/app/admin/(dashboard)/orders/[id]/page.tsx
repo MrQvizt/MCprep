@@ -15,6 +15,7 @@ import {
   ELIGIBILITY_REASON_LABELS,
   FULFILLMENT_LABELS,
   ORDER_STATUS_LABELS,
+  paymentMethodLabel,
 } from "@/lib/orders/labels";
 import { getSettings } from "@/lib/settings";
 import { formatCalendarDate, formatDateTime } from "@/lib/time";
@@ -22,6 +23,7 @@ import { fillTemplate, whatsappLink } from "@/lib/whatsapp";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { quickOrderStatus, retryOrderEmail } from "../actions";
 import { DetailRow, EligibilityBadge, OrderStatusBadge, PaymentBadge } from "../order-ui";
+import { MarkPaidMenu, MarkUnpaidButton } from "../payment-actions";
 import { EligibilityDecisionForm, NoteForm, PricePaymentForm, StatusForm } from "./order-forms";
 
 export const metadata = { title: "Order" };
@@ -43,13 +45,14 @@ const EMAIL_STATUS_LABELS: Record<string, string> = {
 
 const NEXT_STEPS: Record<OrderStatus, { status: OrderStatus; label: string; icon: React.ComponentType<{ className?: string }> }[]> = {
   NEW: [
-    { status: "CONTACTED", label: "Mark contacted", icon: Phone },
-    { status: "CONFIRMED", label: "Mark confirmed", icon: CheckCircle2 },
+    { status: "CONFIRMED", label: "Confirm order", icon: CheckCircle2 },
+    { status: "CONTACTED", label: "Awaiting confirmation", icon: Phone },
   ],
-  CONTACTED: [{ status: "CONFIRMED", label: "Mark confirmed", icon: CheckCircle2 }],
+  CONTACTED: [{ status: "CONFIRMED", label: "Confirm order", icon: CheckCircle2 }],
   CONFIRMED: [
     { status: "IN_PREPARATION", label: "In preparation", icon: ClipboardList },
     { status: "COMPLETED", label: "Mark completed", icon: PackageCheck },
+    { status: "CONTACTED", label: "Not confirmed yet", icon: RotateCw },
   ],
   IN_PREPARATION: [{ status: "COMPLETED", label: "Mark completed", icon: PackageCheck }],
   COMPLETED: [],
@@ -147,6 +150,32 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         )}
         {NEXT_STEPS[order.status].length === 0 && order.status === "COMPLETED" && (
           <span className="text-sm text-muted-foreground">This order is complete. Use the status form to change it if needed.</span>
+        )}
+      </div>
+
+      {/* Payment (recorded manually — no online payments) */}
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+        <span className="px-1 text-sm font-medium text-muted-foreground">Payment:</span>
+        {order.paymentStatus === "PAID" ? (
+          <>
+            <PaymentBadge status="PAID" />
+            <span className="text-sm">
+              {order.paidAmountCents !== null ? formatMoney(order.paidAmountCents, order.currency) : null}
+              {paymentMethodLabel(order.paymentProvider) ? ` · ${paymentMethodLabel(order.paymentProvider)}` : ""}
+              {order.paidAt ? ` · ${formatDateTime(order.paidAt, tz)}` : ""}
+            </span>
+            <MarkUnpaidButton orderId={order.id} reference={order.reference} />
+          </>
+        ) : order.status === "CANCELLED" ? (
+          <span className="text-sm text-muted-foreground">Cancelled — no payment expected.</span>
+        ) : (
+          <>
+            <PaymentBadge status={order.paymentStatus} />
+            <span className="text-sm text-muted-foreground">
+              Due: {money(order.confirmedTotalCents ?? order.totalCents)}
+            </span>
+            <MarkPaidMenu orderId={order.id} />
+          </>
         )}
       </div>
 

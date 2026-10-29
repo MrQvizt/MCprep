@@ -4,8 +4,8 @@ export const ORDER_STATUSES = ["NEW", "CONTACTED", "CONFIRMED", "IN_PREPARATION"
 export type OrderStatusValue = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
-  NEW: "New",
-  CONTACTED: "Contacted",
+  NEW: "New request",
+  CONTACTED: "Awaiting confirmation",
   CONFIRMED: "Confirmed",
   IN_PREPARATION: "In preparation",
   COMPLETED: "Completed",
@@ -14,21 +14,37 @@ export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
 
 export const ORDER_STATUS_HINTS: Record<OrderStatusValue, string> = {
   NEW: "Just received — contact the customer.",
-  CONTACTED: "You've reached out; waiting to confirm details.",
-  CONFIRMED: "Details and price agreed with the customer.",
+  CONTACTED: "You've been in touch, but it isn't confirmed yet.",
+  CONFIRMED: "Details and price agreed with the customer — it's going ahead.",
   IN_PREPARATION: "Meals are being prepared.",
   COMPLETED: "Delivered or collected.",
-  CANCELLED: "Will not go ahead.",
+  CANCELLED: "Not going ahead.",
 };
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  NOT_COLLECTED: "Payment not collected",
+  NOT_COLLECTED: "Not paid yet",
   PENDING: "Payment pending",
   PAID: "Paid",
   PARTIALLY_REFUNDED: "Partially refunded",
   REFUNDED: "Refunded",
   FAILED: "Payment failed",
 };
+
+/** How a manually recorded payment was made (stored in Order.paymentProvider). */
+export const PAYMENT_METHODS = {
+  CASH: "Cash",
+  REVOLUT: "Revolut",
+  BANK_TRANSFER: "Bank transfer",
+  CARD: "Card",
+  OTHER: "Other",
+} as const;
+export type PaymentMethod = keyof typeof PAYMENT_METHODS;
+
+export function paymentMethodLabel(provider: string | null | undefined): string | null {
+  if (!provider) return null;
+  if (provider === "manual") return null; // older records: method not recorded
+  return PAYMENT_METHODS[provider as PaymentMethod] ?? provider;
+}
 
 export const FULFILLMENT_LABELS: Record<string, string> = {
   COLLECTION: "Collection",
