@@ -133,6 +133,72 @@ export const siteSettingsSchema = z.object({
   announcementHref: str(""),
 });
 
+const milestoneSchema = z.object({
+  days: z.number().int().min(2).max(365),
+  points: z.number().int().min(1).max(10_000),
+});
+
+const rewardSchema = z.object({
+  key: z.string().trim().regex(/^[a-z0-9-]{2,40}$/),
+  name: z.string().trim().min(2).max(60),
+  description: z.string().trim().max(200).default(""),
+  points: z.number().int().min(1).max(100_000),
+  /** Percentage off the next order; null = an item the team adds to the next order. */
+  percentOff: z.number().int().min(1).max(100).nullable().default(null),
+});
+
+export type LoyaltyReward = z.infer<typeof rewardSchema>;
+export type LoyaltyMilestone = z.infer<typeof milestoneSchema>;
+
+/**
+ * Daily streak scheme: customers with an account check in once a day (Malta
+ * calendar) to earn points, with bonuses at streak milestones; points are
+ * swapped for rewards that are honoured on their next order.
+ */
+export const loyaltySettingsSchema = z.object({
+  enabled: bool(true),
+  pointsPerCheckIn: z.number().int().min(1).max(1000).catch(10).default(10),
+  milestones: z
+    .array(milestoneSchema)
+    .max(12)
+    .catch([])
+    .default([
+      { days: 3, points: 20 },
+      { days: 7, points: 50 },
+      { days: 14, points: 100 },
+      { days: 30, points: 300 },
+    ]),
+  rewards: z
+    .array(rewardSchema)
+    .max(12)
+    .catch([])
+    .default([
+      {
+        key: "protein-dessert",
+        name: "Free protein dessert",
+        description: "A protein dessert from the current menu, added to your next order.",
+        points: 250,
+        percentOff: null,
+      },
+      {
+        key: "free-meal",
+        name: "A free meal",
+        description: "One extra meal of your choice in your next order.",
+        points: 450,
+        percentOff: null,
+      },
+      {
+        key: "ten-percent-off",
+        name: "10% off your next order",
+        description: "Taken off your next package price.",
+        points: 700,
+        percentOff: 10,
+      },
+    ]),
+  /** Rewards can be redeemed only after the customer's first confirmed order (stops points farming). */
+  redeemRequiresConfirmedOrder: bool(true),
+});
+
 export const SETTINGS_SCHEMAS = {
   business: businessSettingsSchema,
   contact: contactSettingsSchema,
@@ -142,6 +208,7 @@ export const SETTINGS_SCHEMAS = {
   fulfillment: fulfillmentSettingsSchema,
   orderForm: orderFormSettingsSchema,
   site: siteSettingsSchema,
+  loyalty: loyaltySettingsSchema,
 } as const;
 
 export type SettingsGroup = keyof typeof SETTINGS_SCHEMAS;

@@ -617,6 +617,14 @@ model Order {
   utmTerm      String?
   utmContent   String?
 
+  // Customer portal: set when placed while signed in, or claimed with the private confirmation link.
+  accountId           String?
+  account             CustomerAccount?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  // Loyalty reward used on this order (snapshot)
+  rewardName          String?
+  rewardDiscountCents Int               @default(0)
+  rewardRedemption    RewardRedemption?
+
   // Customer-facing confirmation page access (hashed random token)
   confirmationTokenHash String?   @unique
   confirmationExpiresAt DateTime? @db.Timestamptz(3)
@@ -644,6 +652,7 @@ model Order {
   @@index([customerId])
   @@index([promotionId])
   @@index([planId])
+  @@index([accountId])
 }
 
 /// Dishes the customer chose for their package (per week), snapshotted at order time.
@@ -996,4 +1005,126 @@ model ChecklistItemState {
   doneById  String?
   note      String?
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer portal: accounts, sessions, daily streaks & rewards
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A customer's sign-in for the portal. Orders appear in the portal only when
+/// they were placed while signed in or claimed with their private
+/// confirmation link — never just because an email address matches.
+model CustomerAccount {
+  id             String    @id @default(cuid())
+  email          String    @unique // normalised (lower-case)
+  name           String
+  phone          String?
+  passwordHash   String
+  // Incremented on password change / sign-out everywhere to revoke sessions.
+  sessionVersion Int       @default(1)
+  lastLoginAt    DateTime? @db.Timestamptz(3)
+  // Daily streak (Malta calendar days) and points balance (sum of the ledger).
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastCheckInDay DateTime? @db.Date
+  pointsBalance  Int       @default(0)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  sessions    CustomerSession[]
+  resets      CustomerPasswordReset[]
+  checkIns    CustomerCheckIn[]
+  ledger      RewardLedgerEntry[]
+  redemptions RewardRedemption[]
+  orders      Order[]
+
+  @@index([lastCheckInDay])
+}
+
+model CustomerSession {
+  id             String          @id @default(cuid())
+  accountId      String
+  account        CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash      String          @unique // SHA-256 of the cookie token
+  sessionVersion Int
+  expiresAt      DateTime        @db.Timestamptz(3)
+  lastSeenAt     DateTime        @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+model CustomerPasswordReset {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash   String          @unique
+  expiresAt   DateTime        @db.Timestamptz(3)
+  usedAt      DateTime?       @db.Timestamptz(3)
+  createdById String? // admin who created the link (null = requested by email)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId])
+}
+
+/// One per account per Malta calendar day.
+model CustomerCheckIn {
+  id            String          @id @default(cuid())
+  accountId     String
+  account       CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  day           DateTime        @db.Date
+  streak        Int // streak length after this check-in
+  pointsAwarded Int
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@unique([accountId, day])
+}
+
+enum RewardEntryType {
+  CHECK_IN
+  STREAK_BONUS
+  REDEEMED
+  REFUND // a redeemed reward was cancelled
+  ADJUSTMENT // by the team
+}
+
+model RewardLedgerEntry {
+  id           String          @id @default(cuid())
+  accountId    String
+  account      CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type         RewardEntryType
+  points       Int // positive = earned, negative = spent
+  description  String
+  redemptionId String?
+  createdById  String? // admin, for adjustments
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId, createdAt])
+}
+
+enum RewardRedemptionStatus {
+  AVAILABLE // redeemed with points, not used yet
+  USED // attached to an order
+  CANCELLED // points refunded
+}
+
+model RewardRedemption {
+  id          String                 @id @default(cuid())
+  accountId   String
+  account     CustomerAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  rewardKey   String
+  rewardName  String
+  description String?
+  pointsCost  Int
+  percentOff  Int? // e.g. 10 = 10% off the next order; null = free item, added by the team
+  code        String                 @unique
+  status      RewardRedemptionStatus @default(AVAILABLE)
+  orderId     String?                @unique
+  order       Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  usedAt      DateTime?              @db.Timestamptz(3)
+  cancelledAt DateTime?              @db.Timestamptz(3)
+  createdAt   DateTime               @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId, status])
 }
