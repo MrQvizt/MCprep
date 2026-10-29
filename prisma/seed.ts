@@ -254,7 +254,15 @@ async function seedAdmin() {
   const password = process.env.SEED_ADMIN_PASSWORD;
   if (!email || !password) return;
   const problem = passwordProblem(password);
-  if (problem) throw new Error(`SEED_ADMIN_PASSWORD: ${problem}`);
+  if (problem) {
+    const message = `SEED_ADMIN_PASSWORD: ${problem} The owner account was NOT created.`;
+    // During a deploy, don't take the whole website down because of the admin password.
+    if (once) {
+      console.warn(`\n⚠ ${message} Fix the variable and redeploy.\n`);
+      return;
+    }
+    throw new Error(message);
+  }
   if (await db.adminUser.findUnique({ where: { email } })) return;
   await db.adminUser.create({
     data: {
@@ -283,12 +291,12 @@ async function main() {
   await seedDeliveryAreas();
   await seedListings();
   await seedBlog();
-  await seedAdmin();
   await db.siteSetting.upsert({
     where: { key: SEED_MARKER_KEY },
     create: { key: SEED_MARKER_KEY, value: { seededAt: new Date().toISOString(), profile: demo ? "demo" : "brand-safe" } },
     update: {},
   });
+  await seedAdmin();
   console.log("Done.");
 }
 
