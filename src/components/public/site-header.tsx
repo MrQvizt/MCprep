@@ -94,7 +94,7 @@ export function SiteHeader({
             <Logo brand={brand} priority />
           </Link>
 
-          <nav aria-label="Main" className="hidden lg:block">
+          <nav aria-label="Main" className="hidden xl:block">
             <ul className="flex items-center gap-7">
               {nav.map((item) => (
                 <li key={item.href}>
@@ -102,7 +102,7 @@ export function SiteHeader({
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cn(
-                      "relative text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white",
+                      "relative whitespace-nowrap text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white",
                       "after:absolute after:-bottom-1.5 after:left-0 after:h-px after:w-full after:origin-left after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:scale-x-100",
                       isActive(item.href) && "text-white after:scale-x-100",
                     )}
@@ -125,14 +125,14 @@ export function SiteHeader({
             </Link>
             <Link
               href={ctaHref}
-              className="hidden h-10 items-center bg-white px-5 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-mist sm:inline-flex"
+              className="hidden h-10 items-center whitespace-nowrap bg-white px-5 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-mist sm:inline-flex"
             >
               {ctaLabel}
             </Link>
             <button
               ref={toggleRef}
               type="button"
-              className="inline-grid size-11 place-items-center text-white lg:hidden"
+              className="inline-grid size-11 place-items-center text-white xl:hidden"
               aria-expanded={open}
               aria-controls="mobile-nav"
               aria-label="Open menu"
@@ -151,7 +151,7 @@ export function SiteHeader({
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
-        className="fixed inset-0 z-[65] overflow-y-auto bg-ink text-white lg:hidden"
+        className="fixed inset-0 z-[65] overflow-y-auto bg-ink text-white xl:hidden"
       >
         <div className="container-site flex h-16 items-center justify-between border-b border-white/10">
           <Link
