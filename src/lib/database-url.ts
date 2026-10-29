@@ -13,9 +13,22 @@ type Env = Record<string, string | undefined>;
 
 const clean = (v: string | undefined) => (v && v.trim() !== "" ? v.trim() : undefined);
 
+/**
+ * Value of an integration variable, also when Vercel added it with a custom
+ * prefix (e.g. "MCPREP_POSTGRES_URL_NON_POOLING"). Exact names win.
+ */
+function integrationVar(env: Env, name: string): string | undefined {
+  const exact = clean(env[name]);
+  if (exact) return exact;
+  const key = Object.keys(env)
+    .filter((k) => k.endsWith(`_${name}`) && clean(env[k]))
+    .sort()[0];
+  return key ? clean(env[key]) : undefined;
+}
+
 /** Connection string the application uses at runtime (pooled where available). */
 export function runtimeDatabaseUrl(env: Env = process.env): string | undefined {
-  return clean(env.DATABASE_URL) ?? clean(env.POSTGRES_PRISMA_URL) ?? clean(env.POSTGRES_URL);
+  return clean(env.DATABASE_URL) ?? integrationVar(env, "POSTGRES_PRISMA_URL") ?? integrationVar(env, "POSTGRES_URL");
 }
 
 /**
@@ -24,7 +37,14 @@ export function runtimeDatabaseUrl(env: Env = process.env): string | undefined {
  */
 export function migrationDatabaseUrl(env: Env = process.env): string | undefined {
   if (clean(env.DATABASE_URL)) return clean(env.DIRECT_DATABASE_URL) ?? clean(env.DATABASE_URL);
-  return clean(env.POSTGRES_URL_NON_POOLING) ?? clean(env.POSTGRES_URL);
+  return integrationVar(env, "POSTGRES_URL_NON_POOLING") ?? integrationVar(env, "POSTGRES_URL");
+}
+
+/** Names (never values) of database-related variables that are set — for build diagnostics. */
+export function databaseEnvNames(env: Env = process.env): string[] {
+  return Object.keys(env)
+    .filter((k) => /DATABASE|POSTGRES|SUPABASE/i.test(k) && clean(env[k]))
+    .sort();
 }
 
 /**

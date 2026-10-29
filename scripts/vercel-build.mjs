@@ -14,9 +14,20 @@
  */
 import { execSync } from "node:child_process";
 
-const has = (k) => Boolean(process.env[k] && process.env[k].trim());
-const dbConfigured = ["DATABASE_URL", "POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_PRISMA_URL"].some(has);
 const run = (cmd, env = {}) => execSync(cmd, { stdio: "inherit", env: { ...process.env, ...env } });
+const isSet = (k) => Boolean(process.env[k] && process.env[k].trim());
+
+// Same rules as src/lib/database-url.ts (exact names, or integration names with a custom prefix).
+const DB_NAMES = ["DATABASE_URL", "POSTGRES_URL_NON_POOLING", "POSTGRES_PRISMA_URL", "POSTGRES_URL"];
+const dbConfigured = Object.keys(process.env).some(
+  (k) => isSet(k) && DB_NAMES.some((n) => k === n || k.endsWith(`_${n}`)),
+);
+const related = Object.keys(process.env)
+  .filter((k) => /DATABASE|POSTGRES|SUPABASE/i.test(k) && isSet(k))
+  .sort();
+
+console.log(`▶ Environment: ${process.env.VERCEL_ENV ?? "local"}`);
+console.log(`▶ Database-related variables available (names only): ${related.length ? related.join(", ") : "none"}`);
 
 if (dbConfigured && process.env.SKIP_DB_MIGRATIONS !== "1") {
   console.log("▶ Applying database migrations…");
@@ -25,8 +36,12 @@ if (dbConfigured && process.env.SKIP_DB_MIGRATIONS !== "1") {
     console.log("▶ Adding starter content (first deploy only)…");
     run("npx tsx --conditions=react-server prisma/seed.ts", { SEED_ONCE: "1" });
   }
-} else {
-  console.warn("⚠ No database URL found — skipping migrations. Connect Supabase/Postgres or set DATABASE_URL.");
+} else if (!dbConfigured) {
+  console.warn(
+    `⚠ No database URL found for the "${process.env.VERCEL_ENV ?? "local"}" environment — skipping migrations.\n` +
+      "  Connect Supabase/Postgres to this environment (Vercel → Settings → Environment Variables:\n" +
+      "  enable POSTGRES_PRISMA_URL / POSTGRES_URL_NON_POOLING for Production AND Preview) or set DATABASE_URL.",
+  );
 }
 
 console.log("▶ Building the app…");

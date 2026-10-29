@@ -39,3 +39,18 @@ describe("database URLs", () => {
     );
   });
 });
+
+describe("integration variables with a custom prefix", () => {
+  it("finds prefixed Supabase variables and lists names only", async () => {
+    const { databaseEnvNames } = await import("@/lib/database-url");
+    const env = {
+      MCPREP_POSTGRES_PRISMA_URL: "postgres://pooled",
+      MCPREP_POSTGRES_URL_NON_POOLING: "postgres://direct",
+      MCPREP_SUPABASE_URL: "https://x.supabase.co",
+      OTHER: "x",
+    };
+    expect(runtimeDatabaseUrl(env)).toBe("postgres://pooled");
+    expect(migrationDatabaseUrl(env)).toBe("postgres://direct");
+    expect(databaseEnvNames(env)).toEqual(["MCPREP_POSTGRES_PRISMA_URL", "MCPREP_POSTGRES_URL_NON_POOLING", "MCPREP_SUPABASE_URL"]);
+  });
+});
