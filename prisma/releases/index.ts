@@ -148,6 +148,17 @@ export const RELEASES: Release[] = [
       }
     },
   },
+  {
+    id: "2026-10-30-enable-first-week-offer",
+    description: "Switch the first-week €6 offer on (paused while the live site still ran code that couldn't read it)",
+    async run(db, log) {
+      const r = await db.promotion.updateMany({
+        where: { slug: INTRO_OFFER.slug, discountType: "FIRST_WEEK_MEAL_PRICE", isEnabled: false },
+        data: { isEnabled: true },
+      });
+      if (r.count > 0) log(`Offer switched on: ${INTRO_OFFER.name}`);
+    },
+  },
 ];
 
 /** Run releases that haven't run yet, in order. Returns the ids applied now. */

@@ -24,15 +24,8 @@ export interface CurrentCustomer {
   name: string;
   firstName: string;
   phone: string | null;
-  currentStreak: number;
-  longestStreak: number;
-  /** YYYY-MM-DD (Malta calendar) */
-  lastCheckInDay: string | null;
-  pointsBalance: number;
   createdAt: Date;
 }
-
-const toDay = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
 /** The signed-in customer for this request, or null. Never throws (public pages must keep working). */
 export const getCurrentCustomer = cache(async (): Promise<CurrentCustomer | null> => {
@@ -58,10 +51,6 @@ export const getCurrentCustomer = cache(async (): Promise<CurrentCustomer | null
       name: a.name,
       firstName: a.name.split(/\s+/)[0] || a.name,
       phone: a.phone,
-      currentStreak: a.currentStreak,
-      longestStreak: a.longestStreak,
-      lastCheckInDay: toDay(a.lastCheckInDay),
-      pointsBalance: a.pointsBalance,
       createdAt: a.createdAt,
     };
   } catch (error) {

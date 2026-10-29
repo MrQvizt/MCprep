@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { orderRequestSchema, type OrderRequestInput } from "@/lib/orders/schema";
 import { createOrderRequest, OrderValidationError, quoteForOrder } from "@/lib/orders/service";
-import { applyReleases } from "../../prisma/releases";
+import { applyReleases, RELEASES } from "../../prisma/releases";
 
 const NOW = new Date();
 const MIN = 60_000;
@@ -42,7 +42,7 @@ describe("content release", () => {
     await db.plan.create({ data: { slug: "1-month", name: "1 Month", durationDays: 28, priceCents: 22000 } }); // priced → kept
     const first = await applyReleases(db, () => {});
     const again = await applyReleases(db, () => {});
-    expect(first).toHaveLength(1);
+    expect(first).toHaveLength(RELEASES.length);
     expect(again).toHaveLength(0);
 
     const packages = await db.plan.findMany({ where: { mealsPerDay: { not: null } }, orderBy: { sortOrder: "asc" } });
@@ -65,6 +65,18 @@ describe("content release", () => {
       personalWindowMinutes: 120,
       isEnabled: true,
     });
+  });
+
+  it("switches the first-week offer back on after it was paused", async () => {
+    await applyReleases(db, () => {});
+    await db.promotion.update({ where: { slug: "first-week-6-euro" }, data: { isEnabled: false } });
+    const done = (await db.siteSetting.findUniqueOrThrow({ where: { key: "_releases" } })).value as { applied: string[] };
+    await db.siteSetting.update({
+      where: { key: "_releases" },
+      data: { value: { applied: done.applied.filter((id) => id !== "2026-10-30-enable-first-week-offer") } },
+    });
+    expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-enable-first-week-offer"]);
+    expect((await db.promotion.findUniqueOrThrow({ where: { slug: "first-week-6-euro" } })).isEnabled).toBe(true);
   });
 
   it("doesn't overwrite admin edits on later runs", async () => {
