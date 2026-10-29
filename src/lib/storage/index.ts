@@ -1,7 +1,8 @@
 import "server-only";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { env } from "@/lib/env";
+import { db } from "@/lib/db";
+import { env, storageDriverName } from "@/lib/env";
 
 export interface StoredObject {
   key: string;
@@ -9,7 +10,7 @@ export interface StoredObject {
 }
 
 export interface StorageDriver {
-  readonly name: "local" | "s3";
+  readonly name: "local" | "s3" | "db";
   put(key: string, body: Buffer, contentType: string): Promise<StoredObject>;
   delete(key: string): Promise<void>;
   publicUrl(key: string): string;
@@ -123,17 +124,54 @@ class S3Storage implements StorageDriver {
   }
 }
 
+// ── Database (zero-setup default on Vercel) ─────────────────────────────────
+/**
+ * Keeps image bytes in Postgres and serves them from /media/<key> with a
+ * one-year immutable cache, so the CDN answers almost every request. Fine
+ * for a few hundred photos; use S3-compatible storage for large libraries.
+ */
+export class DatabaseStorage implements StorageDriver {
+  readonly name = "db" as const;
+
+  async put(key: string, body: Buffer, contentType: string): Promise<StoredObject> {
+    assertSafeKey(key);
+    const data = new Uint8Array(body);
+    await db.storedFile.upsert({
+      where: { key },
+      create: { key, contentType, sizeBytes: body.byteLength, data },
+      update: { contentType, sizeBytes: body.byteLength, data },
+    });
+    return { key, url: this.publicUrl(key) };
+  }
+
+  async delete(key: string) {
+    assertSafeKey(key);
+    await db.storedFile.deleteMany({ where: { key } });
+  }
+
+  async read(key: string): Promise<Buffer | null> {
+    assertSafeKey(key);
+    const row = await db.storedFile.findUnique({ where: { key }, select: { data: true } });
+    return row ? Buffer.from(row.data) : null;
+  }
+
+  publicUrl(key: string) {
+    return `/media/${key}`;
+  }
+}
+
 let driver: StorageDriver | null = null;
 
 export function storage(): StorageDriver {
   if (!driver) {
-    const e = env();
-    driver = e.STORAGE_DRIVER === "s3" ? new S3Storage() : new LocalStorage(e.UPLOAD_DIR);
+    const name = storageDriverName();
+    driver = name === "s3" ? new S3Storage() : name === "db" ? new DatabaseStorage() : new LocalStorage(env().UPLOAD_DIR);
   }
   return driver;
 }
 
-export function localStorageDriver(): LocalStorage | null {
+/** The driver that serves files itself from /media (local disk or database), if any. */
+export function servingStorageDriver(): LocalStorage | DatabaseStorage | null {
   const d = storage();
-  return d instanceof LocalStorage ? d : null;
+  return d instanceof LocalStorage || d instanceof DatabaseStorage ? d : null;
 }

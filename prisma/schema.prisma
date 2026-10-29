@@ -1054,3 +1054,13 @@ model CustomerPasswordReset {
 
   @@index([accountId])
 }
+
+/// Uploaded image bytes, used when no S3-compatible storage is configured
+/// (the default on Vercel, whose disk is read-only). Served from /media/<key>.
+model StoredFile {
+  key         String   @id
+  contentType String
+  sizeBytes   Int
+  data        Bytes
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+}

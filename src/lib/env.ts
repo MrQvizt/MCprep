@@ -16,7 +16,8 @@ const envSchema = z.object({
   /** "true" forces indexing on, "false" forces it off (preview/staging). */
   ALLOW_INDEXING: optionalString,
 
-  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  /** Where uploaded images go. Unset: the database on Vercel, local disk elsewhere. */
+  STORAGE_DRIVER: z.enum(["local", "s3", "db"]).optional(),
   UPLOAD_DIR: z.string().default("./storage/uploads"),
   S3_BUCKET: optionalString,
   S3_REGION: optionalString,
@@ -51,6 +52,12 @@ export function env(): ServerEnv {
   }
   cached = parsed.data;
   return cached;
+}
+
+/** The storage driver in use (explicit setting, else database on Vercel, local disk elsewhere). */
+export function storageDriverName(): "local" | "s3" | "db" {
+  const e = env();
+  return e.STORAGE_DRIVER ?? (e.VERCEL_ENV ? "db" : "local");
 }
 
 /**

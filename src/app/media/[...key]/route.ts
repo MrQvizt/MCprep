@@ -1,4 +1,4 @@
-import { localStorageDriver } from "@/lib/storage";
+import { servingStorageDriver } from "@/lib/storage";
 
 const TYPES: Record<string, string> = {
   webp: "image/webp",
@@ -8,10 +8,10 @@ const TYPES: Record<string, string> = {
   avif: "image/avif",
 };
 
-/** Serves locally stored uploads (development / single-server hosting). */
+/** Serves uploads kept on local disk or in the database (S3 files are served by the bucket). */
 export async function GET(_req: Request, ctx: RouteContext<"/media/[...key]">) {
   const { key } = await ctx.params;
-  const driver = localStorageDriver();
+  const driver = servingStorageDriver();
   if (!driver) return new Response("Not found", { status: 404 });
   const joined = key.join("/");
   let body: Buffer | null = null;
@@ -25,7 +25,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/media/[...key]">) {
   return new Response(new Uint8Array(body), {
     headers: {
       "Content-Type": TYPES[ext] ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "default-src 'none'",
     },

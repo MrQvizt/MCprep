@@ -101,7 +101,7 @@ export function HomeHero({
           {facts.length > 0 && (
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-white/15 pt-6 animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:400ms]">
               {facts.map((f) => (
-                <div key={f.label} className="flex flex-col-reverse">
+                <div key={f.label} className="flex flex-col-reverse justify-end">
                   <dt className="mt-1 text-[0.62rem] uppercase tracking-[0.18em] text-white/55">{f.label}</dt>
                   <dd className="font-display text-3xl font-black tabular leading-none sm:text-4xl">{f.value}</dd>
                 </div>
