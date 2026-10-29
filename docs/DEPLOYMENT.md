@@ -34,6 +34,11 @@ Add these variables in Vercel → Settings → Environment Variables, then redep
 | `RESEND_API_KEY`, `EMAIL_FROM` | order emails (they wait in the queue until configured) |
 | `STORAGE_DRIVER=s3` + `S3_*` + `MEDIA_PUBLIC_BASE_URL` | photo uploads (Supabase Storage's S3 endpoint, Cloudflare R2 or AWS S3) |
 
+Using a Supabase connection string as `DATABASE_URL` instead also works: paste either pooler string (port 5432 or
+6543). The app always uses transaction mode (6543) and migrations session mode (5432) — session mode allows only
+15 connections, which serverless functions use up quickly. Functions run in Dublin (`dub1`, set in `vercel.json`),
+next to a Supabase project in eu-west-1 (Ireland); change it if your database is elsewhere.
+
 Preview deployments use the same database unless you give them their own, so test on previews with care.
 Set `SKIP_DB_MIGRATIONS=1` on an environment to stop automatic migrations there.
 
