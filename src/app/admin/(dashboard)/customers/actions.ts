@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { fail, fdString, handleActionError, ok, type ActionState } from "@/lib/actions";
 import { anonymizeCustomer, setCustomerManualStatus, updateCustomerNotes, withdrawMarketingConsent } from "@/lib/admin/customers";
+import { adminCreatePasswordResetLink, adminDeleteWebsiteAccount } from "@/lib/admin/customer-accounts";
 import { OrderActionError } from "@/lib/admin/orders";
 import { AREA_ROLES, assertAdmin } from "@/lib/authz";
 
@@ -13,7 +14,7 @@ function refresh(customerId: string) {
   revalidatePath("/admin/customers");
 }
 
-function customerError(error: unknown): ActionState {
+function customerError(error: unknown): ActionState<never> {
   if (error instanceof OrderActionError) return fail(error.message);
   return handleActionError(error);
 }
@@ -67,4 +68,26 @@ export async function anonymizeCustomerAction(customerId: string): Promise<Actio
     return customerError(error);
   }
   redirect(`/admin/customers/${customerId}?anonymised=1`);
+}
+
+export async function createAccountResetLinkAction(customerId: string, accountId: string): Promise<ActionState<{ url: string }>> {
+  try {
+    const admin = await assertAdmin(AREA_ROLES.customers);
+    const url = await adminCreatePasswordResetLink({ accountId, customerId, actor: admin });
+    refresh(customerId);
+    return ok("Reset link created", { url });
+  } catch (error) {
+    return customerError(error);
+  }
+}
+
+export async function deleteWebsiteAccountAction(customerId: string, accountId: string): Promise<ActionState> {
+  try {
+    const admin = await assertAdmin(AREA_ROLES.customers);
+    await adminDeleteWebsiteAccount({ accountId, customerId, actor: admin });
+    refresh(customerId);
+    return ok("Website account deleted");
+  } catch (error) {
+    return customerError(error);
+  }
 }

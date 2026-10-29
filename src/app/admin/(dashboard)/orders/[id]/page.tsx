@@ -32,6 +32,7 @@ const EMAIL_TYPE_LABELS: Record<string, string> = {
   ORDER_BUSINESS_NOTIFICATION: "Notification to you",
   ORDER_CUSTOMER_CONFIRMATION: "Confirmation to customer",
   TEST: "Test email",
+  ACCOUNT_PASSWORD_RESET: "Password reset link",
 };
 
 const EMAIL_STATUS_TONES = { SENT: "good", PENDING: "info", SENDING: "info", FAILED: "warn", DEAD: "bad" } as const;

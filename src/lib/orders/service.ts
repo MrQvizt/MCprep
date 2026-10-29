@@ -206,6 +206,8 @@ export interface CreateOrderContext {
   now?: Date;
   /** Start of the visitor's personal offer window (verified cookie), if any. */
   offerWindowStartedAt?: Date | null;
+  /** Signed-in customer account placing the order (links it to their portal). */
+  accountId?: string | null;
 }
 
 async function existingByKey(idempotencyKey: string): Promise<CreateOrderResult | null> {
@@ -431,6 +433,7 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
             planMealsIncluded: fullPlan.mealsIncluded,
             planMealsPerWeek: plan.mealsPerWeek,
             planIsSubscription: plan.isSubscription,
+            accountId: ctx.accountId ?? null,
             mealSelections: selections.length
               ? { create: selections.map((sel, i) => ({ ...sel, sortOrder: i })) }
               : undefined,

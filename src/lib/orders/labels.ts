@@ -21,6 +21,25 @@ export const ORDER_STATUS_HINTS: Record<OrderStatusValue, string> = {
   CANCELLED: "Not going ahead.",
 };
 
+/** Wording customers see in their account (the admin labels are for the team). */
+export const CUSTOMER_ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
+  NEW: "Request received",
+  CONTACTED: "Being confirmed",
+  CONFIRMED: "Confirmed",
+  IN_PREPARATION: "Being prepared",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+export const CUSTOMER_ORDER_STATUS_HINTS: Record<OrderStatusValue, string> = {
+  NEW: "We'll be in touch to confirm the details and payment.",
+  CONTACTED: "We're confirming the details with you.",
+  CONFIRMED: "All set — your meals are booked in.",
+  IN_PREPARATION: "Your meals are being cooked and packed.",
+  COMPLETED: "Delivered or collected. Enjoy!",
+  CANCELLED: "This order isn't going ahead.",
+};
+
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   NOT_COLLECTED: "Not paid yet",
   PENDING: "Payment pending",

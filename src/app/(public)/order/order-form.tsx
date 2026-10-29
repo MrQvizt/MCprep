@@ -48,6 +48,8 @@ export interface OrderFormProps {
     offerFirstOrderOnly: boolean;
   }[];
   defaultPlanSlug: string;
+  /** Contact details of the signed-in customer, if any. */
+  prefill?: { fullName: string; email: string; phone: string } | null;
   dishes: DishOption[];
   initialSelections: MealChoice[];
   /** Live offer with a personal deadline ("order within 2 hours"). */
@@ -190,9 +192,9 @@ export function OrderForm(props: OrderFormProps) {
     defaultValues: {
       planSlug: props.defaultPlanSlug,
       mealSelections: props.initialSelections,
-      fullName: "",
-      email: "",
-      phone: "",
+      fullName: props.prefill?.fullName ?? "",
+      email: props.prefill?.email ?? "",
+      phone: props.prefill?.phone ?? "",
       whatsappNumber: "",
       fulfillmentMethod: defaultFulfillment,
       deliveryAreaId: "",

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Check, Clock, Lock, MessageCircle } from "lucide-react";
+import { Check, CheckCircle2, Clock, Lock, MessageCircle, UserRound } from "lucide-react";
+import Link from "next/link";
 import { CtaLink } from "@/components/public/cta-link";
+import { getCurrentCustomer } from "@/lib/customer-auth";
+import { ClaimOrderForm } from "../../account/account-forms";
 import { InstagramIcon, WhatsAppIcon } from "@/components/shared/icons";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
@@ -55,13 +58,15 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
       promotionAudience: true,
       createdAt: true,
       confirmationExpiresAt: true,
+      accountId: true,
     },
   });
   if (!order || !verifyConfirmationToken(order, token)) notFound();
   if (order.confirmationExpiresAt && order.confirmationExpiresAt < now) notFound();
 
-  const settings = await getSettings();
+  const [settings, customer] = await Promise.all([getSettings(), getCurrentCustomer()]);
   const c = settings.contact;
+  const claimQuery = `?ref=${encodeURIComponent(order.reference)}&t=${encodeURIComponent(token)}`;
   const firstName = order.customerName.split(/\s+/)[0] || order.customerName;
   const verification = order.promotionName !== null && order.promotionAudience !== "ALL_CUSTOMERS";
   const wa = c.whatsappEnabled
@@ -193,8 +198,80 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
             </p>
           </div>
           <p className="mt-4 text-xs text-fog">Keep your reference handy. This page is private to you.</p>
+          <AccountCard
+            state={
+              order.accountId
+                ? customer && order.accountId === customer.id
+                  ? "saved"
+                  : "other"
+                : customer
+                  ? "claim"
+                  : "signed-out"
+            }
+            reference={order.reference}
+            token={token}
+            claimQuery={claimQuery}
+          />
         </aside>
       </div>
     </section>
+  );
+}
+
+/** Nudge to keep the order in an account (or confirm it already is). */
+function AccountCard({
+  state,
+  reference,
+  token,
+  claimQuery,
+}: {
+  state: "saved" | "claim" | "signed-out" | "other";
+  reference: string;
+  token: string;
+  claimQuery: string;
+}) {
+  if (state === "other") return null;
+  if (state === "saved") {
+    return (
+      <p className="mt-6 flex items-center gap-2 border border-white/15 p-4 text-sm">
+        <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+        <span>
+          Saved to{" "}
+          <Link href="/account" className="font-semibold underline underline-offset-4">
+            your account
+          </Link>
+          {" "}— order it again any time.
+        </span>
+      </p>
+    );
+  }
+  return (
+    <div className="light mt-6 bg-paper p-6 text-ink">
+      <p className="flex items-center gap-2 font-display text-lg font-black uppercase">
+        <UserRound className="size-5" aria-hidden="true" /> Re-order in two taps
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-ink/70">
+        {state === "claim"
+          ? "Save this order to your account to track it and order the same package again."
+          : "Create a free account to track this order, keep your details filled in and order the same package again in two taps."}
+      </p>
+      <div className="mt-5">
+        {state === "claim" ? (
+          <ClaimOrderForm reference={reference} token={token} />
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Link
+              href={`/account/sign-up${claimQuery}`}
+              className="inline-flex h-12 items-center justify-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.16em] text-white hover:bg-charcoal"
+            >
+              Create my account
+            </Link>
+            <Link href={`/account/sign-in${claimQuery}`} className="text-center text-sm text-ink/70 underline underline-offset-4 hover:text-ink">
+              I already have an account
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

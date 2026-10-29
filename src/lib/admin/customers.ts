@@ -218,6 +218,17 @@ export async function exportCustomerData(customerId: string) {
     },
   });
   if (!customer) return null;
+  const refs = customer.orders.map((o) => o.reference);
+  const accountOr = [
+    ...(customer.email ? [{ email: customer.email.toLowerCase() }] : []),
+    ...(refs.length ? [{ orders: { some: { reference: { in: refs } } } }] : []),
+  ];
+  const websiteAccounts = accountOr.length
+    ? await db.customerAccount.findMany({
+        where: { OR: accountOr },
+        select: { email: true, name: true, phone: true, createdAt: true, lastLoginAt: true },
+      })
+    : [];
   return {
     exportedAt: new Date().toISOString(),
     note: "Personal data held by MC PREPS about this customer. Internal staff notes are excluded.",
@@ -239,6 +250,7 @@ export async function exportCustomerData(customerId: string) {
       createdAt: r.createdAt,
     })),
     marketingConsents: customer.marketingConsents,
+    websiteAccounts,
   };
 }
 
@@ -253,11 +265,18 @@ export async function anonymizeCustomer(input: { customerId: string; actor: Audi
   const result = await db.$transaction(async (tx) => {
     const customer = await tx.customer.findUnique({
       where: { id: input.customerId },
-      select: { id: true, anonymizedAt: true, orders: { select: { id: true } } },
+      select: { id: true, email: true, anonymizedAt: true, orders: { select: { id: true } } },
     });
     if (!customer) throw new OrderActionError("This customer no longer exists.");
     if (customer.anonymizedAt) throw new OrderActionError("This customer has already been anonymised.");
     const orderIds = customer.orders.map((o) => o.id);
+
+    // Their website login goes too (its sessions and reset links cascade; orders are unlinked).
+    const accountMatch = [
+      ...(customer.email ? [{ email: customer.email.toLowerCase() }] : []),
+      ...(orderIds.length ? [{ orders: { some: { id: { in: orderIds } } } }] : []),
+    ];
+    if (accountMatch.length) await tx.customerAccount.deleteMany({ where: { OR: accountMatch } });
 
     if (orderIds.length) {
       await tx.order.updateMany({

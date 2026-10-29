@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader, type NavItem } from "@/components/public/site-header";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { getContent } from "@/lib/content";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 import { getOfferWindowStart } from "@/lib/offer-window-server";
 import { formatTime12, nextCutoff } from "@/lib/order-cutoff";
 import { discountShortLabel } from "@/lib/promotions/format";
@@ -18,12 +19,13 @@ import { whatsappLink } from "@/lib/whatsapp";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const now = await requestNow();
-  const [settings, brand, footer, livePromos, windowStart] = await Promise.all([
+  const [settings, brand, footer, livePromos, windowStart, customer] = await Promise.all([
     getSettings(),
     getBrandAssets(),
     getContent("page.footer"),
     getLivePublicPromotions(now).catch(() => []),
     getOfferWindowStart(now),
+    getCurrentCustomer(),
   ]);
 
   // Offer with a personal deadline ("order within 2 hours"): shown until this visitor's window ends.
@@ -116,6 +118,7 @@ export default async function PublicLayout({ children }: { children: React.React
           ctaHref="/order"
           whatsappHref={waPlain}
           instagramUrl={c.instagramUrl || null}
+          account={customer ? { firstName: customer.firstName } : null}
         />
         <main id="main" className="flex-1">
           {children}

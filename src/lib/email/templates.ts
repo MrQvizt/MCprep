@@ -322,3 +322,19 @@ export function renderTestEmail(brand: EmailBrand): RenderedEmail {
     text: "Email delivery works. This is a test email sent from your website's admin portal.",
   };
 }
+
+export function renderPasswordResetEmail(brand: EmailBrand, name: string, link: string): RenderedEmail {
+  const firstName = name.split(/\s+/)[0] || name;
+  return {
+    subject: safeHeader(`Reset your ${brand.tradingName} password`),
+    html: layout(
+      brand,
+      "Use this link within an hour to choose a new password.",
+      `<h1 style="margin:0 0 12px;font-size:22px;">Hi ${escapeHtml(firstName)},</h1>
+<p style="margin:0 0 16px;">Someone (hopefully you) asked to reset the password for your ${escapeHtml(brand.tradingName)} account. The link works once, for the next hour.</p>
+<p style="margin:24px 0;"><a href="${escapeHtml(link)}" style="display:inline-block;background:#080808;color:#ffffff;text-decoration:none;padding:12px 20px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:13px;">Choose a new password</a></p>
+<p style="margin:0;color:#595959;font-size:13px;">If you didn't ask for this, you can ignore this email — your password stays the same.</p>`,
+    ),
+    text: `Hi ${firstName},\n\nUse this link within an hour to choose a new password for your ${brand.tradingName} account:\n${link}\n\nIf you didn't ask for this, ignore this email — your password stays the same.`,
+  };
+}

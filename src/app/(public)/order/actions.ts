@@ -5,6 +5,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/actions";
 import { processOutbox } from "@/lib/email/outbox";
 import { orderRequestSchema, quoteRequestSchema, type OrderRequestInput, type QuoteRequest } from "@/lib/orders/schema";
 import { getOfferWindowStart } from "@/lib/offer-window-server";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 import { createOrderRequest, OrderValidationError, quoteForOrder } from "@/lib/orders/service";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/request";
@@ -50,7 +51,8 @@ export async function submitOrderAction(input: OrderRequestInput): Promise<Actio
 
   try {
     const now = new Date();
-    const result = await createOrderRequest(data, { now, offerWindowStartedAt: await getOfferWindowStart(now) });
+    const [offerWindowStartedAt, customer] = await Promise.all([getOfferWindowStart(now), getCurrentCustomer()]);
+    const result = await createOrderRequest(data, { now, offerWindowStartedAt, accountId: customer?.id ?? null });
     if (result.emailIds.length > 0) {
       // Best-effort immediate delivery; failures stay queued for retry.
       after(() => processOutbox({ ids: result.emailIds }).catch((e) => console.error("[order] email send failed", e)));

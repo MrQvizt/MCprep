@@ -1,5 +1,7 @@
 import { Breadcrumbs } from "@/components/public/breadcrumbs";
+import Link from "next/link";
 import { CtaLink } from "@/components/public/cta-link";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 import { env } from "@/lib/env";
 import { getOfferWindowStart } from "@/lib/offer-window-server";
 import { earliestStartDate, formatTime12, nextCutoff } from "@/lib/order-cutoff";
@@ -42,13 +44,14 @@ function parseDishes(raw: string | undefined, dishes: { id: string; slug: string
 export default async function OrderPage({ searchParams }: PageProps<"/order">) {
   const sp = await searchParams;
   const now = await requestNow();
-  const [settings, plans, meals, areas, points, windowStart] = await Promise.all([
+  const [settings, plans, meals, areas, points, windowStart, customer] = await Promise.all([
     getSettings(),
     getPublicPlans(),
     getPublishedMeals(),
     getDeliveryAreas(),
     getCollectionPoints(),
     getOfferWindowStart(now),
+    getCurrentCustomer(),
   ]);
   const currency = settings.business.currency || "EUR";
   const promos = await getLivePublicPromotions(now, currency).catch(() => []);
@@ -145,6 +148,7 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
     serverNow: now.toISOString(),
     plans: plans.map(toOption),
     defaultPlanSlug: defaultPlan.slug,
+    prefill: customer ? { fullName: customer.name, email: customer.email, phone: customer.phone ?? "" } : null,
     dishes,
     initialSelections,
     intro,
@@ -215,6 +219,20 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-fog sm:text-lg">
           Pick your meals and days, choose your dishes, and send your request. We&apos;ll confirm{" "}
           {settings.fulfillment.deliveryEnabled ? "delivery or collection" : "collection"} and payment with you personally.
+        </p>
+        <p className="mt-4 text-sm text-fog">
+          {customer ? (
+            <>
+              Signed in as <strong className="text-white">{customer.firstName}</strong> — your details are filled in and this order will appear in{" "}
+              <Link href="/account" className="text-white underline underline-offset-4">your account</Link>.
+            </>
+          ) : (
+            <>
+              Ordered before?{" "}
+              <Link href="/account/sign-in?next=/order" className="text-white underline underline-offset-4">Sign in</Link> to fill in your details
+              and keep track of your orders.
+            </>
+          )}
         </p>
       </section>
       <OrderForm {...props} />

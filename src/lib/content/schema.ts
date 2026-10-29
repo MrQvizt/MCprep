@@ -444,12 +444,14 @@ export const privacyPolicySchema = legalPageSchema(
 <ul>
 <li><strong>Order request details:</strong> your name, email address, phone number, optional WhatsApp number, chosen plan, preferred start date, collection or delivery choice and delivery address.</li>
 <li><strong>Preferences and allergies (optional):</strong> dietary preferences, allergies or intolerances and special instructions you choose to give us. Allergy information can be health data, so we only process it with your explicit consent, given in the order form.</li>
+<li><strong>Your account (optional):</strong> if you create an account, your name, email address, phone number, a securely hashed password (we never see the password itself), when you last signed in, and which of your orders are saved to it. A sign-in cookie keeps you signed in for up to 60 days.</li>
 <li><strong>Marketing preferences:</strong> only if you tick the separate marketing box.</li>
 <li><strong>Technical data:</strong> basic, cookieless usage statistics (pages viewed, buttons clicked) that do not identify you. Optional analytics cookies are only used if you accept them.</li>
 </ul>
 <h2>Why we use it (and our legal basis)</h2>
 <ul>
 <li>To respond to and fulfil your order request — taking steps at your request before entering into a contract, and performing that contract.</li>
+<li>To run your account, if you create one (sign-in, order history, re-ordering and password resets) — performing our agreement with you. You can delete your account at any time in your account settings.</li>
 <li>To prepare your meals safely around allergies — your explicit consent, which you can withdraw at any time.</li>
 <li>To send marketing emails — your consent, which you can withdraw at any time.</li>
 <li>To keep the website secure and prevent abuse — our legitimate interests.</li>
@@ -492,7 +494,7 @@ export const cookiePolicySchema = legalPageSchema(
   "Cookie Policy",
   `${REVIEW_BANNER}
 <h2>Strictly necessary</h2>
-<p>We use a small number of cookies that the website needs to work, such as remembering your cookie choices and keeping administrators signed in. These do not require consent.</p>
+<p>We use a small number of cookies that the website needs to work, such as remembering your cookie choices, keeping you signed in to your account (if you have one), holding your personal offer deadline, and keeping administrators signed in. These do not require consent.</p>
 <h2>Cookieless statistics</h2>
 <p>We count page views and button clicks without cookies and without storing anything on your device. These statistics do not identify you.</p>
 <h2>Optional analytics and marketing</h2>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 import { Logo, type BrandAssetsLite } from "@/components/brand/logo";
 import { InstagramIcon, WhatsAppIcon } from "@/components/shared/icons";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -21,7 +21,10 @@ export function SiteHeader({
   ctaHref = "/order",
   whatsappHref,
   instagramUrl,
+  account = null,
 }: {
+  /** Signed-in customer (first name), or null when signed out. */
+  account?: { firstName: string } | null;
   brand: BrandAssetsLite;
   nav: NavItem[];
   ctaLabel?: string;
@@ -113,6 +116,14 @@ export function SiteHeader({
 
           <div className="flex items-center gap-2">
             <Link
+              href={account ? "/account" : "/account/sign-in"}
+              aria-current={pathname.startsWith("/account") ? "page" : undefined}
+              className="hidden h-10 items-center gap-2 px-2 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white sm:inline-flex"
+            >
+              <UserRound className="size-4" aria-hidden="true" />
+              <span className="max-w-[9rem] truncate">{account ? account.firstName : "Sign in"}</span>
+            </Link>
+            <Link
               href={ctaHref}
               className="hidden h-10 items-center bg-white px-5 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-mist sm:inline-flex"
             >
@@ -187,8 +198,15 @@ export function SiteHeader({
             ))}
           </ul>
           <Link
+            href={account ? "/account" : "/account/sign-in"}
+            className="mt-6 inline-flex items-center gap-2 py-2 text-sm font-semibold uppercase tracking-[0.14em] text-white/80"
+            onClick={() => setOpenOn(null)}
+          >
+            <UserRound className="size-4" aria-hidden="true" /> {account ? "Your account" : "Sign in to your account"}
+          </Link>
+          <Link
             href={ctaHref}
-            className="mt-8 inline-flex h-14 items-center justify-center bg-white text-sm font-semibold uppercase tracking-[0.16em] text-ink"
+            className="mt-6 inline-flex h-14 items-center justify-center bg-white text-sm font-semibold uppercase tracking-[0.16em] text-ink"
           >
             {ctaLabel}
           </Link>
