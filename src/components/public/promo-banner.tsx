@@ -41,14 +41,14 @@ export function PromoBanner({
   return (
     <section
       aria-labelledby={`promo-${promo.id}`}
-      className={cn("relative isolate overflow-hidden bg-ink text-white", className)}
+      className={cn("relative isolate overflow-hidden border-y border-white/10 bg-ink text-white", className)}
       data-promotion={promo.slug}
     >
       <div className="absolute inset-0 -z-10">
         {promo.imageUrl ? (
           <MediaImage media={{ url: promo.imageUrl, altText: promo.imageAlt }} alt="" className="absolute inset-0 opacity-35" sizes="100vw" />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(90%_120%_at_100%_0%,#262626_0%,#080808_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(70%_110%_at_100%_100%,#262626_0%,#080808_62%)]" />
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
       </div>
@@ -73,7 +73,14 @@ export function PromoBanner({
           )}
           {!ended && (
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <CtaLink href={href} size="lg" data-promotion={promo.slug} tabIndex={preview ? -1 : undefined}>
+              <CtaLink
+                href={href}
+                size="lg"
+                data-promotion={promo.slug}
+                data-track="select_promotion"
+                data-track-promotion={promo.slug}
+                tabIndex={preview ? -1 : undefined}
+              >
                 {text(promo.ctaText)}
               </CtaLink>
               {promo.audience === "NEW_CUSTOMERS" && (

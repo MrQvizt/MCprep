@@ -4,12 +4,32 @@ import { cn } from "@/lib/utils";
 import { CtaLink } from "./cta-link";
 import { Price } from "./price";
 
+function orderLink(plan: string, promo: string | null, extra?: Record<string, string | null | undefined>) {
+  const sp = new URLSearchParams({ plan });
+  if (promo) sp.set("promo", promo);
+  for (const [k, v] of Object.entries(extra ?? {})) if (v) sp.set(k, v);
+  return `/order?${sp.toString()}`;
+}
+
 /**
  * Pricing card. Prices always come from the database (never hard-coded); an
  * active promotion shows the original price struck through. First-order
  * offers are clearly labelled as subject to verification.
  */
-export function PlanCard({ plan, currency = "EUR", className }: { plan: PublicPlan; currency?: string; className?: string }) {
+export function PlanCard({
+  plan,
+  currency = "EUR",
+  className,
+  orderParams,
+  headingLevel: H = "h3",
+}: {
+  plan: PublicPlan;
+  currency?: string;
+  className?: string;
+  /** Extra query parameters for the order link (e.g. utm_campaign from a landing page). */
+  orderParams?: Record<string, string | null | undefined>;
+  headingLevel?: "h2" | "h3";
+}) {
   const featured = plan.isRecommended;
   const offer = plan.offer;
   const perWeek = plan.priceCents !== null && plan.durationDays >= 7 ? Math.round((offer?.priceCents ?? plan.priceCents) / (plan.durationDays / 7)) : null;
@@ -29,7 +49,7 @@ export function PlanCard({ plan, currency = "EUR", className }: { plan: PublicPl
       )}
       <header>
         {plan.tagline && <p className="eyebrow text-current/60">{plan.tagline}</p>}
-        <h3 className="mt-2 display-md">{plan.name}</h3>
+        <H className="mt-2 display-md">{plan.name}</H>
         {plan.description && <p className="mt-3 text-sm leading-relaxed text-current/70">{plan.description}</p>}
       </header>
 
@@ -76,10 +96,14 @@ export function PlanCard({ plan, currency = "EUR", className }: { plan: PublicPl
 
       <div className="mt-auto pt-8">
         <CtaLink
-          href={`/order?plan=${encodeURIComponent(plan.slug)}${offer ? `&promo=${encodeURIComponent(offer.promotionSlug)}` : ""}`}
+          href={orderLink(plan.slug, offer?.promotionSlug ?? null, orderParams)}
           variant={featured ? "dark" : "primary"}
           className="w-full"
           data-plan={plan.slug}
+          data-track="select_plan"
+          data-track-plan={plan.slug}
+          data-track-promotion={offer?.promotionSlug}
+          aria-label={`Choose the ${plan.name} plan`}
         >
           Choose this plan
         </CtaLink>
