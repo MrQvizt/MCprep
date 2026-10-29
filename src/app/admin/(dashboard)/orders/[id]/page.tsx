@@ -202,6 +202,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
                   "Not linked"
                 )}
               </DetailRow>
+              <DetailRow label="Website account">{order.account ? `Saved to ${order.account.email}` : "Not saved to an account"}</DetailRow>
               <DetailRow label="Flags">
                 {order.isReturningCustomer || order.isPotentialDuplicate ? (
                   <span className="flex flex-wrap gap-1.5">

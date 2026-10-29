@@ -90,8 +90,4 @@ export async function endCustomerSession() {
   store.delete(CUSTOMER_COOKIE);
 }
 
-/** Only allow redirects to paths on this site. */
-export function safeNext(next: string | null | undefined, fallback = "/account"): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  return next.slice(0, 300);
-}
+export { safeNext } from "@/lib/safe-next";

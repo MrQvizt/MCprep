@@ -126,9 +126,12 @@ export async function resetPassword(token: string, password: string) {
 export async function claimOrder(accountId: string, reference: string, token: string) {
   const order = await db.order.findUnique({
     where: { reference: reference.slice(0, 20) },
-    select: { id: true, idempotencyKey: true, accountId: true },
+    select: { id: true, idempotencyKey: true, accountId: true, confirmationExpiresAt: true },
   });
   if (!order || !verifyConfirmationToken(order, token)) throw new AccountError("We couldn't find that order.");
+  if (order.confirmationExpiresAt && order.confirmationExpiresAt.getTime() < Date.now()) {
+    throw new AccountError("This order link has expired. Message us and we'll add the order to your account.");
+  }
   if (order.accountId && order.accountId !== accountId) throw new AccountError("This order is already saved to another account.");
   if (!order.accountId) await db.order.update({ where: { id: order.id }, data: { accountId } });
   return order.id;

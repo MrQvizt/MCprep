@@ -125,6 +125,10 @@ describe("customer accounts", () => {
 
     const b = await account("someone.else@example.com");
     expect((await accountError(claimOrder(b.id, o.reference, o.token))).message).toMatch(/another account/);
+
+    const old = await order("old.order@example.com");
+    await db.order.update({ where: { id: old.orderId }, data: { confirmationExpiresAt: new Date(Date.now() - 1000) } });
+    expect((await accountError(claimOrder(b.id, old.reference, old.token))).message).toMatch(/expired/);
   });
 
   it("links orders placed while signed in", async () => {
