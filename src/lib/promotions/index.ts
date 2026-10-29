@@ -187,3 +187,9 @@ export const PROMOTION_STATE_LABELS: Record<PromotionState, string> = {
   EXPIRED: "Ended",
   LIMIT_REACHED: "Limit reached",
 };
+
+/**
+ * Fill promotion copy tokens so text always matches the configured offer:
+ * {discount} → "20%" / "€10", {ends} → "31 October, 23:59".
+ */
+export { formatPromoText, discountShortLabel } from "./format";
