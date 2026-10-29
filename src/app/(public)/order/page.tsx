@@ -1,34 +1,55 @@
 import { Breadcrumbs } from "@/components/public/breadcrumbs";
 import { CtaLink } from "@/components/public/cta-link";
-import { quoteForOrder } from "@/lib/orders/service";
+import { env } from "@/lib/env";
+import { getOfferWindowStart } from "@/lib/offer-window-server";
 import { FIRST_ORDER_DECLARATION } from "@/lib/orders/schema";
-import { getCollectionPoints, getDeliveryAreas, getPublicPlans, requestNow } from "@/lib/public-data";
+import { quoteForOrder } from "@/lib/orders/service";
+import { evenSplit, isPackage, type MealChoice } from "@/lib/packages";
+import { getLivePublicPromotions } from "@/lib/promotions";
+import { getCollectionPoints, getDeliveryAreas, getPublicPlans, getPublishedMeals, requestNow } from "@/lib/public-data";
 import { staticPageMetadata } from "@/lib/seo/metadata";
 import { getSettings } from "@/lib/settings";
 import { addDaysToDateString, zonedDateString } from "@/lib/time";
 import { whatsappLink } from "@/lib/whatsapp";
-import { env } from "@/lib/env";
-import { discountLabel, COUPON_MESSAGES } from "@/lib/pricing";
 import { OrderForm, type OrderFormProps } from "./order-form";
-import type { QuoteView } from "./actions";
+import { toQuoteView } from "./quote-view";
 
 export async function generateMetadata() {
   return staticPageMetadata("order");
 }
 
-function str(v: string | string[] | undefined): string | undefined {
-  return typeof v === "string" ? v.slice(0, 80) : undefined;
+function str(v: string | string[] | undefined, max = 80): string | undefined {
+  return typeof v === "string" ? v.slice(0, max) : undefined;
+}
+
+/** "?dishes=chicken-pokebowl:4,mexican-beef-bowl:6" → dish choices (unknown dishes ignored). */
+function parseDishes(raw: string | undefined, dishes: { id: string; slug: string }[]): MealChoice[] {
+  if (!raw) return [];
+  const out: MealChoice[] = [];
+  for (const part of raw.split(",").slice(0, 20)) {
+    const [slug, qty] = part.split(":");
+    const dish = dishes.find((d) => d.slug === slug);
+    const quantity = Number(qty);
+    if (dish && Number.isInteger(quantity) && quantity > 0 && quantity <= 60 && !out.some((c) => c.mealId === dish.id)) {
+      out.push({ mealId: dish.id, quantity });
+    }
+  }
+  return out;
 }
 
 export default async function OrderPage({ searchParams }: PageProps<"/order">) {
   const sp = await searchParams;
   const now = await requestNow();
-  const [settings, plans, areas, points] = await Promise.all([
+  const [settings, plans, meals, areas, points, windowStart] = await Promise.all([
     getSettings(),
     getPublicPlans(),
+    getPublishedMeals(),
     getDeliveryAreas(),
     getCollectionPoints(),
+    getOfferWindowStart(now),
   ]);
+  const currency = settings.business.currency || "EUR";
+  const promos = await getLivePublicPromotions(now, currency).catch(() => []);
   const brandName = settings.business.tradingName;
   const c = settings.contact;
   const wa = whatsappLink(c.whatsappNumber, c.whatsappDefaultMessage);
@@ -37,9 +58,7 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
     return (
       <section className="container-site py-24">
         <h1 className="display-lg">Order requests are paused</h1>
-        <p className="mt-4 max-w-xl text-fog">
-          Our meal plans are being updated. Message us and we&apos;ll help you directly.
-        </p>
+        <p className="mt-4 max-w-xl text-fog">Our packages are being updated. Message us and we&apos;ll help you directly.</p>
         {wa && (
           <CtaLink href={wa} className="mt-8">
             Message us on WhatsApp
@@ -49,61 +68,83 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
     );
   }
 
+  const packages = plans.filter(isPackage);
   const requested = str(sp.plan);
   const defaultPlan =
-    plans.find((p) => p.slug === requested) ?? plans.find((p) => p.isRecommended) ?? plans[0];
+    plans.find((p) => p.slug === requested) ??
+    packages.find((p) => p.isRecommended) ??
+    packages[0] ??
+    plans.find((p) => p.isRecommended) ??
+    plans[0];
   const coupon = str(sp.code)?.toUpperCase();
 
-  const qc = await quoteForOrder({ planSlug: defaultPlan.slug, couponCode: coupon, now });
-  const initialQuote: QuoteView | null = qc
+  const dishes = meals.map((m) => ({
+    id: m.id,
+    slug: m.slug,
+    name: m.name,
+    imageUrl: m.image?.url ?? null,
+    imageAlt: m.image?.altText ?? m.name,
+    calories: m.calories,
+    proteinG: m.proteinG,
+    carbsG: m.carbsG,
+    fatG: m.fatG,
+    label: m.label,
+  }));
+  let initialSelections = parseDishes(str(sp.dishes, 400), dishes);
+  if (initialSelections.length === 0 && defaultPlan.mealsPerWeek) {
+    initialSelections = evenSplit(
+      dishes.map((d) => d.id),
+      defaultPlan.mealsPerWeek,
+    );
+  }
+
+  const qc = await quoteForOrder({ planSlug: defaultPlan.slug, couponCode: coupon, now, offerWindowStartedAt: windowStart });
+  // Live offer with a personal deadline ("order within 2 hours"), if any.
+  const personal = promos.filter((p) => p.personalWindowMinutes).sort((a, b) => (a.endsAt < b.endsAt ? -1 : 1))[0] ?? null;
+  const intro = personal
     ? {
-        planName: qc.plan.name,
-        basePriceCents: qc.quote.basePriceCents,
-        discountCents: qc.quote.discountCents,
-        deliveryFeeCents: qc.quote.deliveryFeeCents,
-        totalCents: qc.quote.totalCents,
-        promotion: qc.quote.promotion
-          ? {
-              name: qc.quote.promotion.name,
-              label: discountLabel(qc.quote.promotion),
-              endsAt: qc.quote.promotion.endsAt.toISOString(),
-              audience: qc.quote.promotion.audience,
-            }
-          : null,
-        requiresVerification: qc.quote.requiresVerification,
-        couponStatus: qc.quote.couponStatus,
-        couponMessage: COUPON_MESSAGES[qc.quote.couponStatus],
-        firstOrderOffer: qc.quote.availableFirstOrderOffer
-          ? {
-              name: qc.quote.availableFirstOrderOffer.name,
-              discountCents: qc.quote.availableFirstOrderOffer.discountCents,
-              endsAt: qc.quote.availableFirstOrderOffer.endsAt.toISOString(),
-            }
-          : null,
-        minOrderShortfallCents: null,
-        deliveryAreaName: null,
+        name: personal.name,
+        headline: personal.headline,
+        discountType: personal.discountType,
+        discountValue: personal.discountValue,
+        label: personal.discountLabel,
+        windowMinutes: personal.personalWindowMinutes!,
+        endsAt: personal.endsAt,
+        startedAt: windowStart?.toISOString() ?? null,
+        terms: personal.terms,
+        newCustomersOnly: personal.audience === "NEW_CUSTOMERS",
       }
     : null;
 
   const today = zonedDateString(now, settings.business.timeZone);
+  const toOption = (p: (typeof plans)[number]) => ({
+    slug: p.slug,
+    name: p.name,
+    tagline: p.tagline,
+    durationDays: p.durationDays,
+    mealsIncluded: p.mealsIncluded,
+    priceCents: p.priceCents,
+    isRecommended: p.isRecommended,
+    savingsLabel: p.savingsLabel,
+    mealsPerDay: p.mealsPerDay,
+    daysPerWeek: p.daysPerWeek,
+    isSubscription: p.isSubscription,
+    mealsPerWeek: p.mealsPerWeek,
+    perMealCents: p.perMealCents,
+    offerPriceCents: p.offer?.priceCents ?? null,
+    offerFirstOrderOnly: p.offer?.firstOrderOnly ?? false,
+  });
   const props: OrderFormProps = {
     brandName,
-    currency: settings.business.currency || "EUR",
+    currency,
     serverNow: now.toISOString(),
-    plans: plans.map((p) => ({
-      slug: p.slug,
-      name: p.name,
-      tagline: p.tagline,
-      durationDays: p.durationDays,
-      mealsIncluded: p.mealsIncluded,
-      priceCents: p.priceCents,
-      isRecommended: p.isRecommended,
-      offerPriceCents: p.offer?.priceCents ?? null,
-      offerFirstOrderOnly: p.offer?.firstOrderOnly ?? false,
-    })),
+    plans: plans.map(toOption),
     defaultPlanSlug: defaultPlan.slug,
+    dishes,
+    initialSelections,
+    intro,
     initialCoupon: coupon ?? "",
-    initialQuote,
+    initialQuote: qc ? toQuoteView(qc) : null,
     areas: areas
       .filter((a) => a.deliveryAvailable)
       .map((a) => ({
@@ -153,13 +194,13 @@ export default async function OrderPage({ searchParams }: PageProps<"/order">) {
 
   return (
     <div className="bg-ink">
-      <section className="container-site pb-10 pt-10 sm:pt-14">
-        <Breadcrumbs items={[{ name: "Plans", path: "/plans" }, { name: "Order request", path: "/order" }]} />
-        <p className="eyebrow mt-8 text-fog">Order request · No payment taken online</p>
-        <h1 className="mt-3 display-xl">Request your plan</h1>
+      <section className="container-site pb-8 pt-10 sm:pt-14">
+        <Breadcrumbs items={[{ name: "Packages", path: "/plans" }, { name: "Build your package", path: "/order" }]} />
+        <p className="eyebrow mt-8 text-fog">Build your package · No payment taken online</p>
+        <h1 className="mt-3 display-xl">Build your package</h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-fog sm:text-lg">
-          Tell us what you&apos;d like and how you&apos;d like to receive it. Our team will contact you to confirm
-          availability, {settings.fulfillment.deliveryEnabled ? "delivery or collection" : "collection"} details and payment.
+          Pick your meals and days, choose your dishes, and send your request. We&apos;ll confirm{" "}
+          {settings.fulfillment.deliveryEnabled ? "delivery or collection" : "collection"} and payment with you personally.
         </p>
       </section>
       <OrderForm {...props} />

@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useForm, useWatch, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Check, Loader2, Lock, Tag, Truck, Store } from "lucide-react";
+import { AlertCircle, Check, Flame, Loader2, Lock, Tag, Truck, Store } from "lucide-react";
 import { readAttribution, useTrack } from "@/components/analytics/analytics-provider";
 import { Countdown } from "@/components/shared/countdown";
 import { WhatsAppIcon } from "@/components/shared/icons";
 import { formatMoney } from "@/lib/money";
 import { orderFormSchema, type OrderFormInput, type OrderFormValues, type OrderRequestInput } from "@/lib/orders/schema";
+import { evenSplit, isPackage, mealSelectionProblem, packageLabel, selectionTotal, type MealChoice } from "@/lib/packages";
 import { formatCalendarDate, formatWeekdays } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { getQuoteAction, submitOrderAction, type QuoteView } from "./actions";
+import { getQuoteAction, startOfferWindowAction, submitOrderAction, type QuoteView } from "./actions";
+import { DishPicker, type DishOption } from "./dish-picker";
+import { PackageBuilder } from "./package-builder";
 
 declare global {
   interface Window {
@@ -33,10 +36,31 @@ export interface OrderFormProps {
     mealsIncluded: number | null;
     priceCents: number | null;
     isRecommended: boolean;
+    savingsLabel: string | null;
+    mealsPerDay: number | null;
+    daysPerWeek: number | null;
+    isSubscription: boolean;
+    mealsPerWeek: number | null;
+    perMealCents: number | null;
     offerPriceCents: number | null;
     offerFirstOrderOnly: boolean;
   }[];
   defaultPlanSlug: string;
+  dishes: DishOption[];
+  initialSelections: MealChoice[];
+  /** Live offer with a personal deadline ("order within 2 hours"). */
+  intro: {
+    name: string;
+    headline: string;
+    discountType: string;
+    discountValue: number;
+    label: string;
+    windowMinutes: number;
+    endsAt: string;
+    startedAt: string | null;
+    terms: string | null;
+    newCustomersOnly: boolean;
+  } | null;
   initialCoupon: string;
   initialQuote: QuoteView | null;
   areas: {
@@ -142,7 +166,7 @@ export function OrderForm(props: OrderFormProps) {
   const router = useRouter();
   const track = useTrack();
   const uid = useId();
-  const money = (c: number) => formatMoney(c, props.currency);
+  const money = (c: number) => formatMoney(c, props.currency, { hideZeroDecimals: true });
 
   const deliveryPossible = props.fulfillment.deliveryEnabled;
   const collectionPossible = props.fulfillment.collectionEnabled;
@@ -153,6 +177,7 @@ export function OrderForm(props: OrderFormProps) {
     handleSubmit,
     control,
     setError,
+    clearErrors,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<OrderFormInput, unknown, OrderFormValues>({
@@ -160,6 +185,7 @@ export function OrderForm(props: OrderFormProps) {
     mode: "onTouched",
     defaultValues: {
       planSlug: props.defaultPlanSlug,
+      mealSelections: props.initialSelections,
       fullName: "",
       email: "",
       phone: "",
@@ -184,20 +210,45 @@ export function OrderForm(props: OrderFormProps) {
     },
   });
 
-  const [planSlug, fulfillmentMethod, deliveryAreaId, firstOrderDeclared, allergies, phone] = useWatch({
+  const [planSlug, fulfillmentMethod, deliveryAreaId, firstOrderDeclared, allergies, phone, watchedSelections] = useWatch({
     control,
-    name: ["planSlug", "fulfillmentMethod", "deliveryAreaId", "firstOrderDeclared", "allergies", "phone"],
+    name: ["planSlug", "fulfillmentMethod", "deliveryAreaId", "firstOrderDeclared", "allergies", "phone", "mealSelections"],
   });
+  const mealSelections = useMemo(() => (watchedSelections ?? []) as MealChoice[], [watchedSelections]);
+
+  // ── Personal offer window ("order within 2 hours") ────────────────────────
+  // Starts the first time the visitor sees the offer; the server keeps the start time.
+  const [windowStartedAt, setWindowStartedAt] = useState<string | null>(props.intro?.startedAt ?? null);
+  const [windowServerNow, setWindowServerNow] = useState(props.serverNow);
+  useEffect(() => {
+    if (!props.intro || windowStartedAt) return;
+    let cancelled = false;
+    void startOfferWindowAction().then((r) => {
+      if (cancelled || !r) return;
+      setWindowServerNow(r.serverNow);
+      setWindowStartedAt(r.startedAt);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.intro, windowStartedAt]);
+  const introDeadline = useMemo(() => {
+    if (!props.intro || !windowStartedAt) return null;
+    const personal = new Date(windowStartedAt).getTime() + props.intro.windowMinutes * 60_000;
+    return new Date(Math.min(personal, new Date(props.intro.endsAt).getTime())).toISOString();
+  }, [props.intro, windowStartedAt]);
 
   // ── Live server-side quote ────────────────────────────────────────────────
   const [quote, setQuote] = useState<QuoteView | null>(props.initialQuote);
   const [couponInput, setCouponInput] = useState(props.initialCoupon);
   const [appliedCoupon, setAppliedCoupon] = useState(props.initialCoupon);
   const [quotePending, startQuote] = useTransition();
-  const lastQuoteKey = useRef(JSON.stringify([props.defaultPlanSlug, props.initialCoupon, false, defaultFulfillment, ""]));
+  const lastQuoteKey = useRef(
+    JSON.stringify([props.defaultPlanSlug, props.initialCoupon, false, defaultFulfillment, "", props.intro?.startedAt ?? null]),
+  );
 
   useEffect(() => {
-    const key = JSON.stringify([planSlug, appliedCoupon, Boolean(firstOrderDeclared), fulfillmentMethod, deliveryAreaId ?? ""]);
+    const key = JSON.stringify([planSlug, appliedCoupon, Boolean(firstOrderDeclared), fulfillmentMethod, deliveryAreaId ?? "", windowStartedAt]);
     if (key === lastQuoteKey.current) return;
     lastQuoteKey.current = key;
     startQuote(async () => {
@@ -210,7 +261,7 @@ export function OrderForm(props: OrderFormProps) {
       });
       setQuote(q);
     });
-  }, [planSlug, appliedCoupon, firstOrderDeclared, fulfillmentMethod, deliveryAreaId]);
+  }, [planSlug, appliedCoupon, firstOrderDeclared, fulfillmentMethod, deliveryAreaId, windowStartedAt]);
 
   // ── Analytics: begin_order once, select_plan on change ────────────────────
   const began = useRef(false);
@@ -239,6 +290,35 @@ export function OrderForm(props: OrderFormProps) {
   const [navigating, setNavigating] = useState(false);
 
   const selectedPlan = props.plans.find((p) => p.slug === planSlug) ?? props.plans[0];
+  const packages = useMemo(() => props.plans.filter(isPackage), [props.plans]);
+  const otherPlans = useMemo(() => props.plans.filter((p) => !isPackage(p)), [props.plans]);
+  const perWeek = selectedPlan?.mealsPerWeek ?? null;
+
+  // Keep dish choices in step with the package: re-mix if untouched, trim if over.
+  const customised = useRef(false);
+  const setSelections = (next: MealChoice[], byUser = true) => {
+    if (byUser) customised.current = true;
+    setValue("mealSelections", next, { shouldDirty: true });
+    if (errors.mealSelections) clearErrors("mealSelections");
+  };
+  const lastPerWeek = useRef(perWeek);
+  useEffect(() => {
+    if (lastPerWeek.current === perWeek) return;
+    lastPerWeek.current = perWeek;
+    if (!perWeek) return;
+    if (!customised.current) {
+      setValue("mealSelections", evenSplit(props.dishes.map((d) => d.id), perWeek));
+      return;
+    }
+    let over = selectionTotal(mealSelections) - perWeek;
+    if (over <= 0) return;
+    const trimmed = [...mealSelections].reverse().map((c) => {
+      const cut = Math.min(c.quantity, over);
+      over -= cut;
+      return { ...c, quantity: c.quantity - cut };
+    });
+    setValue("mealSelections", trimmed.reverse().filter((c) => c.quantity > 0));
+  }, [perWeek, mealSelections, props.dishes, setValue]);
   const selectedArea = props.areas.find((a) => a.id === deliveryAreaId) ?? null;
   const areasByRegion = useMemo(() => {
     const groups = new Map<string, OrderFormProps["areas"]>();
@@ -254,6 +334,15 @@ export function OrderForm(props: OrderFormProps) {
 
   const submit = async (values: OrderFormValues) => {
       setFormError(null);
+      if (perWeek) {
+        const problem = mealSelectionProblem(values.mealSelections, perWeek, props.dishes.map((d) => d.id));
+        if (problem) {
+          setError("mealSelections", { type: "manual", message: problem });
+          setFormError(problem);
+          document.getElementById(`${uid}-dishes`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+      }
       idempotencyKey.current ??= crypto.randomUUID();
       track("submit_order", { planSlug: values.planSlug });
       const payload: OrderRequestInput = {
@@ -286,6 +375,8 @@ export function OrderForm(props: OrderFormProps) {
   const onInvalid = () => setFormError("Please check the highlighted fields.");
 
   const busy = isSubmitting || navigating;
+  /** Step numbers shift down by one when there's no dish step. */
+  const stepN = (n: number) => (perWeek && props.dishes.length > 0 ? n : n - 1);
   const err = (name: keyof OrderFormInput) => errors[name]?.message as string | undefined;
   const aria = (name: keyof OrderFormInput) => ({
     "aria-invalid": errors[name] ? true : undefined,
@@ -294,6 +385,9 @@ export function OrderForm(props: OrderFormProps) {
   const fid = (name: string) => `${uid}-${name}`;
 
   // ── Summary values ────────────────────────────────────────────────────────
+  const chosenDishes = props.dishes
+    .map((d) => ({ ...d, quantity: mealSelections.find((c) => c.mealId === d.id)?.quantity ?? 0 }))
+    .filter((d) => d.quantity > 0);
   const base = quote?.basePriceCents ?? selectedPlan?.priceCents ?? null;
   const total = quote?.totalCents ?? base;
   const discount = quote?.discountCents ?? 0;
@@ -307,14 +401,38 @@ export function OrderForm(props: OrderFormProps) {
       </div>
       <dl className="mt-5 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-smoke">Plan</dt>
+          <dt className="text-smoke">{perWeek ? "Package" : "Plan"}</dt>
           <dd className="text-right font-semibold">
-            {selectedPlan?.name}
-            {selectedPlan?.mealsIncluded ? <span className="block text-xs font-normal text-smoke">{selectedPlan.mealsIncluded} meals</span> : null}
+            {perWeek ? packageLabel(selectedPlan) : selectedPlan?.name}
+            {perWeek ? (
+              <span className="block text-xs font-normal text-smoke">
+                {perWeek} meals a week · {selectedPlan.isSubscription ? "Monthly (4 weeks)" : "1 week"}
+                {selectedPlan.perMealCents !== null ? ` · ${money(selectedPlan.perMealCents)}/meal` : ""}
+              </span>
+            ) : selectedPlan?.mealsIncluded ? (
+              <span className="block text-xs font-normal text-smoke">{selectedPlan.mealsIncluded} meals</span>
+            ) : null}
           </dd>
         </div>
+        {perWeek && chosenDishes.length > 0 && (
+          <div className="flex justify-between gap-4">
+            <dt className="text-smoke">Dishes / week</dt>
+            <dd className="text-right text-xs leading-relaxed">
+              {chosenDishes.map((d) => (
+                <span key={d.id} className="block">
+                  {d.quantity}× {d.name}
+                </span>
+              ))}
+              {selectionTotal(mealSelections) !== perWeek && (
+                <span className="mt-1 block font-semibold text-red-700">
+                  {selectionTotal(mealSelections)} of {perWeek} chosen
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
         <div className="flex justify-between gap-4">
-          <dt className="text-smoke">Plan price</dt>
+          <dt className="text-smoke">{selectedPlan?.isSubscription ? "First 4 weeks" : perWeek ? "Price" : "Plan price"}</dt>
           <dd className={cn("tabular font-semibold", discount > 0 && "text-smoke line-through")}>
             {base === null ? "Confirmed with you" : money(base)}
           </dd>
@@ -346,9 +464,21 @@ export function OrderForm(props: OrderFormProps) {
         </p>
         <p className="font-display text-4xl font-black tabular leading-none">{total === null ? "—" : money(total)}</p>
       </div>
+      {selectedPlan?.isSubscription && base !== null && (
+        <p className="mt-3 text-xs text-smoke">
+          Then {money(base)} every 4 weeks. Cancel or pause any time — just tell us.
+        </p>
+      )}
       {quote?.promotion && (
         <div className="mt-5 border-t border-ink/15 pt-4">
-          <Countdown endsAt={quote.promotion.endsAt} serverNow={props.serverNow} size="sm" label="Offer ends in" refreshOnEnd={false} endedLabel="This offer has ended — the price will update." />
+          <Countdown
+            endsAt={quote.promotion.endsAt}
+            serverNow={windowServerNow}
+            size="sm"
+            label={props.intro && introDeadline === quote.promotion.endsAt ? "Your price is held for" : "Offer ends in"}
+            refreshOnEnd={false}
+            endedLabel="This offer has ended — the price will update."
+          />
         </div>
       )}
       <p className="mt-5 flex gap-2.5 bg-mist p-3 text-sm leading-relaxed">
@@ -359,7 +489,7 @@ export function OrderForm(props: OrderFormProps) {
   );
 
   return (
-    <form onSubmit={(e) => void handleSubmit(submit, onInvalid)(e)} onFocusCapture={onFirstInteraction} noValidate className="container-site grid gap-10 pb-24 lg:grid-cols-12 lg:gap-14">
+    <form onSubmit={(e) => void handleSubmit(submit, onInvalid)(e)} onFocusCapture={onFirstInteraction} noValidate className="container-site grid gap-10 pb-32 lg:grid-cols-12 lg:gap-14 lg:pb-24">
       {props.turnstileSiteKey && (
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
@@ -373,13 +503,45 @@ export function OrderForm(props: OrderFormProps) {
       )}
 
       <div className="space-y-14 lg:col-span-7">
-        {/* 1 — Plan */}
+        {props.intro && introDeadline && (
+          <IntroOfferCard
+            intro={props.intro}
+            deadline={introDeadline}
+            serverNow={windowServerNow}
+            money={money}
+            firstWeekCents={quote?.firstWeekCents ?? null}
+            perWeek={perWeek}
+            declared={Boolean(firstOrderDeclared)}
+            applied={Boolean(quote?.promotion && quote.promotion.name === props.intro.name && discount > 0)}
+          >
+            <label className="mt-4 flex items-start gap-3 text-sm">
+              <input type="checkbox" className="mt-1 size-5 shrink-0 accent-white" {...register("firstOrderDeclared")} />
+              <span>{props.declarationText}</span>
+            </label>
+          </IntroOfferCard>
+        )}
+
+        {/* 1 — Package */}
         <fieldset>
           <legend className="contents">
-            <StepHeading n={1} title="Choose your plan" />
+            <StepHeading n={1} title={packages.length > 0 ? "Build your package" : "Choose your plan"} />
           </legend>
+          <input type="hidden" {...register("planSlug")} />
+          {packages.length > 0 ? (
+            <PackageBuilder
+              packages={packages}
+              selectedSlug={isPackage(selectedPlan) ? selectedPlan.slug : packages[0].slug}
+              onSelect={(slug) => setValue("planSlug", slug, { shouldDirty: true })}
+              money={money}
+            />
+          ) : null}
+          {otherPlans.length > 0 && (
+            <div className={cn(packages.length > 0 && "mt-8")}>
+              {packages.length > 0 && (
+                <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-white/80">Or choose another plan</p>
+              )}
           <div className="grid gap-3 sm:grid-cols-3">
-            {props.plans.map((p) => {
+            {otherPlans.map((p) => {
               const checked = p.slug === planSlug;
               return (
                 <label
@@ -389,7 +551,13 @@ export function OrderForm(props: OrderFormProps) {
                     checked ? "border-white bg-white text-ink" : "border-white/20 hover:border-white/60",
                   )}
                 >
-                  <input type="radio" value={p.slug} {...register("planSlug")} className="sr-only" />
+                  <input
+                    type="radio"
+                    name="otherPlan"
+                    checked={checked}
+                    onChange={() => setValue("planSlug", p.slug, { shouldDirty: true })}
+                    className="sr-only"
+                  />
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-display text-lg font-black uppercase">{p.name}</span>
                     {checked && <Check className="size-4" aria-hidden="true" />}
@@ -417,13 +585,35 @@ export function OrderForm(props: OrderFormProps) {
               );
             })}
           </div>
+            </div>
+          )}
           {err("planSlug") && <p role="alert" className="mt-3 text-sm text-red-300">{err("planSlug")}</p>}
         </fieldset>
+
+        {/* 2 — Dishes */}
+        {perWeek && props.dishes.length > 0 ? (
+          <fieldset id={`${uid}-dishes`} className="scroll-mt-28">
+            <legend className="contents">
+              <StepHeading
+                n={2}
+                title={`Choose your ${perWeek} meals`}
+                description="Pick how many of each dish you'd like each week — or mix them evenly."
+              />
+            </legend>
+            <DishPicker
+              dishes={props.dishes}
+              perWeek={perWeek}
+              value={mealSelections}
+              onChange={(next) => setSelections(next)}
+              error={errors.mealSelections?.message as string | undefined}
+            />
+          </fieldset>
+        ) : null}
 
         {/* 2 — Details */}
         <fieldset>
           <legend className="contents">
-            <StepHeading n={2} title="Your details" description="So our team can contact you to confirm your order." />
+            <StepHeading n={stepN(3)} title="Your details" description="So our team can contact you to confirm your order." />
           </legend>
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -460,7 +650,7 @@ export function OrderForm(props: OrderFormProps) {
         {/* 3 — Fulfilment */}
         <fieldset>
           <legend className="contents">
-            <StepHeading n={3} title="Collection or delivery" />
+            <StepHeading n={stepN(4)} title="Collection or delivery" />
           </legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -612,7 +802,7 @@ export function OrderForm(props: OrderFormProps) {
         {/* 4 — Start & preferences */}
         <fieldset>
           <legend className="contents">
-            <StepHeading n={4} title="Start date & preferences" description="All optional — tell us anything that helps." />
+            <StepHeading n={stepN(5)} title="Start date & preferences" description="All optional — tell us anything that helps." />
           </legend>
           <div className="grid gap-6">
             {props.form.askStartDate && (
@@ -680,10 +870,10 @@ export function OrderForm(props: OrderFormProps) {
         {/* 5 — Offers */}
         <fieldset>
           <legend className="contents">
-            <StepHeading n={5} title="Offers" />
+            <StepHeading n={stepN(6)} title="Offers" />
           </legend>
           <div className="space-y-6">
-            {showDeclaration && (
+            {showDeclaration && !(props.intro && introDeadline) && (
               <div className="border border-white p-5">
                 {quote?.firstOrderOffer && !firstOrderDeclared && (
                   <p className="mb-3 text-sm">
@@ -729,8 +919,29 @@ export function OrderForm(props: OrderFormProps) {
         </fieldset>
       </div>
 
+      {/* Mobile: the total and a way to the summary stay in reach */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/15 bg-ink/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-fog">
+              {perWeek ? packageLabel(selectedPlan) : selectedPlan?.name}
+            </p>
+            <p className="font-display text-2xl font-black tabular leading-none">
+              {total === null ? "—" : money(total)}
+              {discount > 0 && base !== null && <span className="ml-2 text-sm font-normal text-fog line-through">{money(base)}</span>}
+            </p>
+          </div>
+          <a
+            href="#order-summary"
+            className="grid h-11 shrink-0 place-items-center bg-white px-4 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink"
+          >
+            Review &amp; send
+          </a>
+        </div>
+      </div>
+
       {/* Summary + consent + submit */}
-      <aside className="lg:col-span-5">
+      <aside id="order-summary" className="scroll-mt-24 lg:col-span-5">
         <div className="space-y-6 lg:sticky lg:top-28">
           {summary}
           <div className="space-y-4 text-sm">
@@ -791,5 +1002,71 @@ export function OrderForm(props: OrderFormProps) {
         </div>
       </aside>
     </form>
+  );
+}
+
+/** "Your first week: €6 a meal — order within 2 hours" with the visitor's own countdown. */
+function IntroOfferCard({
+  intro,
+  deadline,
+  serverNow,
+  money,
+  firstWeekCents,
+  perWeek,
+  declared,
+  applied,
+  children,
+}: {
+  intro: NonNullable<OrderFormProps["intro"]>;
+  deadline: string;
+  serverNow: string;
+  money: (cents: number) => string;
+  firstWeekCents: number | null;
+  perWeek: number | null;
+  declared: boolean;
+  applied: boolean;
+  children?: React.ReactNode;
+}) {
+  const mealPrice = intro.discountType === "FIRST_WEEK_MEAL_PRICE" ? intro.discountValue : null;
+  const offerWeek = mealPrice !== null && perWeek ? mealPrice * perWeek : null;
+  return (
+    <section aria-label={intro.name} className="relative overflow-hidden border border-white bg-white/[0.04] p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-5">
+        <div className="max-w-md">
+          <p className="eyebrow inline-flex items-center gap-2 text-white">
+            <Flame className="size-4" aria-hidden="true" /> {intro.newCustomersOnly ? "New customer offer" : "Limited offer"}
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none sm:text-3xl">{intro.headline}</h2>
+          {offerWeek !== null && firstWeekCents !== null && firstWeekCents > offerWeek ? (
+            <p className="mt-2 text-sm text-fog">
+              Your first week: <span className="font-semibold text-white">{money(offerWeek)}</span>{" "}
+              <span className="line-through">{money(firstWeekCents)}</span> — save {money(firstWeekCents - offerWeek)}.
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-fog">{intro.label} on your first week.</p>
+          )}
+        </div>
+        <Countdown
+          endsAt={deadline}
+          serverNow={serverNow}
+          size="sm"
+          label="Order within"
+          refreshOnEnd={false}
+          endedLabel="Your 2-hour window has ended"
+        />
+      </div>
+      {children}
+      {declared && applied && (
+        <p role="status" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300">
+          <Check className="size-4" aria-hidden="true" /> Applied to your summary — confirmed by our team before payment.
+        </p>
+      )}
+      {intro.terms && (
+        <details className="mt-3 text-xs text-fog">
+          <summary className="cursor-pointer select-none hover:text-white">Offer terms</summary>
+          <p className="mt-2 leading-relaxed">{intro.terms}</p>
+        </details>
+      )}
+    </section>
   );
 }

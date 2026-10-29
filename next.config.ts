@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     qualities: [60, 75, 85],
-    localPatterns: [{ pathname: "/media/**" }, { pathname: "/brand/**" }],
+    localPatterns: [{ pathname: "/media/**" }, { pathname: "/brand/**" }, { pathname: "/images/**" }],
     remotePatterns: remoteMediaPatterns(),
   },
   async headers() {

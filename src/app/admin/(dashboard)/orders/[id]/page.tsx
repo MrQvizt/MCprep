@@ -185,10 +185,23 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
           <AdminCard title="Order & fulfilment">
             <dl className="divide-y">
-              <DetailRow label="Plan">
-                {order.planName} · {order.planDurationDays} days
-                {order.planMealsIncluded ? ` · ${order.planMealsIncluded} meals` : ""}
+              <DetailRow label={order.planMealsPerWeek ? "Package" : "Plan"}>
+                {order.planName}
+                {order.planMealsPerWeek
+                  ? ` · ${order.planMealsPerWeek} meals a week · ${order.planIsSubscription ? "monthly subscription (every 4 weeks)" : "1 week"}`
+                  : ` · ${order.planDurationDays} days${order.planMealsIncluded ? ` · ${order.planMealsIncluded} meals` : ""}`}
               </DetailRow>
+              {order.mealSelections.length > 0 && (
+                <DetailRow label="Dishes per week">
+                  <ul className="space-y-0.5">
+                    {order.mealSelections.map((m) => (
+                      <li key={m.id}>
+                        <span className="font-semibold tabular">{m.quantity}×</span> {m.mealName}
+                      </li>
+                    ))}
+                  </ul>
+                </DetailRow>
+              )}
               <DetailRow label="Fulfilment">
                 <span className="inline-flex items-center gap-1.5">
                   <Truck className="size-4 text-muted-foreground" /> {FULFILLMENT_LABELS[order.fulfillmentMethod]}

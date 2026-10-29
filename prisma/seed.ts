@@ -235,7 +235,7 @@ async function main() {
     // Starter content was already added once; never re-create content the owner removed.
     await seedAdmin();
     console.log("Starter content already seeded — skipped.");
-    await applyReleases(db, log);
+    await applyReleases(db);
     return;
   }
   await seedFaqs();
@@ -251,7 +251,7 @@ async function main() {
   });
   await seedAdmin();
   // Menu, packages and offers supplied by the business (also applied to existing databases).
-  await applyReleases(db, log);
+  await applyReleases(db);
   console.log("Done.");
 }
 

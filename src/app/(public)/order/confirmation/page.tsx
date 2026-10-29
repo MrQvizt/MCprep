@@ -39,6 +39,9 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
       planName: true,
       planDurationDays: true,
       planMealsIncluded: true,
+      planMealsPerWeek: true,
+      planIsSubscription: true,
+      mealSelections: { orderBy: { sortOrder: "asc" }, select: { mealName: true, quantity: true } },
       fulfillmentMethod: true,
       deliveryLocality: true,
       collectionPointName: true,
@@ -118,12 +121,30 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
             <p className="mt-2 font-display text-2xl font-black tracking-wide">{order.reference}</p>
             <dl className="mt-6 space-y-3 text-sm">
               <div className="flex justify-between gap-4">
-                <dt className="text-smoke">Plan</dt>
+                <dt className="text-smoke">{order.planMealsPerWeek ? "Package" : "Plan"}</dt>
                 <dd className="text-right font-semibold">
                   {order.planName}
-                  {order.planMealsIncluded ? ` · ${order.planMealsIncluded} meals` : ""}
+                  <span className="block text-xs font-normal text-smoke">
+                    {order.planMealsPerWeek
+                      ? `${order.planMealsPerWeek} meals a week · ${order.planIsSubscription ? "monthly subscription" : "1 week"}`
+                      : order.planMealsIncluded
+                        ? `${order.planMealsIncluded} meals`
+                        : null}
+                  </span>
                 </dd>
               </div>
+              {order.mealSelections.length > 0 && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-smoke">Dishes / week</dt>
+                  <dd className="text-right text-xs leading-relaxed">
+                    {order.mealSelections.map((m) => (
+                      <span key={m.mealName} className="block">
+                        {m.quantity}× {m.mealName}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Fulfilment</dt>
                 <dd className="text-right font-semibold">
@@ -138,7 +159,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
                 </div>
               )}
               <div className="flex justify-between gap-4 border-t border-ink/10 pt-3">
-                <dt className="text-smoke">Plan price</dt>
+                <dt className="text-smoke">{order.planIsSubscription ? "First 4 weeks" : "Price"}</dt>
                 <dd className="tabular font-semibold">{order.basePriceCents === null ? "Confirmed with you" : money(order.basePriceCents)}</dd>
               </div>
               {order.promotionName && order.discountCents > 0 && (
@@ -161,6 +182,9 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps<
               <p className="text-xs font-semibold uppercase tracking-[0.16em]">{verification ? "Estimated total" : "Quoted total"}</p>
               <p className="font-display text-3xl font-black tabular">{order.totalCents === null ? "—" : money(order.totalCents)}</p>
             </div>
+            {order.planIsSubscription && order.basePriceCents !== null && (
+              <p className="mt-2 text-xs text-smoke">Then {money(order.basePriceCents)} every 4 weeks.</p>
+            )}
             <p className="mt-5 flex gap-2.5 bg-mist p-3 text-sm leading-relaxed">
               <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>

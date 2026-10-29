@@ -133,7 +133,7 @@ export const RELEASES: Release[] = [
         appliesToAllPlans: true,
         requiresCode: false,
         code: null,
-        startsAt: now,
+        startsAt: new Date(now.getTime() - 60 * 60_000), // live straight away (allow for clock differences)
         endsAt: new Date(now.getTime() + 3 * 365 * 86_400_000),
         isEnabled: true,
         showCountdown: true,

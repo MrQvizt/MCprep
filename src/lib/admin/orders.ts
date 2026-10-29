@@ -412,6 +412,7 @@ export async function getOrderDetail(id: string) {
     where: { id },
     include: {
       plan: { select: { id: true, name: true, priceCents: true, archivedAt: true } },
+      mealSelections: { orderBy: { sortOrder: "asc" }, select: { id: true, mealName: true, quantity: true } },
       promotion: { select: { id: true, name: true, slug: true, audience: true, endsAt: true } },
       deliveryArea: { select: { id: true, name: true } },
       collectionPoint: { select: { id: true, name: true } },
