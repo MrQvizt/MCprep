@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { migrationDatabaseUrl, runtimeDatabaseUrl, withNodePostgresSslCompat } from "@/lib/database-url";
+import {
+  migrationDatabaseUrl,
+  preferTransactionPooler,
+  runtimeDatabaseUrl,
+  withNodePostgresSslCompat,
+} from "@/lib/database-url";
 
 const supabase = {
   POSTGRES_PRISMA_URL: "postgres://u:p@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true",
@@ -52,5 +57,32 @@ describe("integration variables with a custom prefix", () => {
     expect(runtimeDatabaseUrl(env)).toBe("postgres://pooled");
     expect(migrationDatabaseUrl(env)).toBe("postgres://direct");
     expect(databaseEnvNames(env)).toEqual(["MCPREP_POSTGRES_PRISMA_URL", "MCPREP_POSTGRES_URL_NON_POOLING", "MCPREP_SUPABASE_URL"]);
+  });
+
+  it("moves Supabase's session pooler to transaction mode for the app (not for migrations)", () => {
+    const session = "postgresql://postgres.ref:p%40ss@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require";
+    const out = new URL(preferTransactionPooler(session, {}));
+    expect(out.port).toBe("6543");
+    expect(out.username).toBe("postgres.ref");
+    expect(out.password).toBe("p%40ss");
+    expect(out.searchParams.get("sslmode")).toBe("require");
+    // Default port (5432) is treated the same.
+    expect(new URL(preferTransactionPooler("postgres://u:p@aws-1-eu-west-1.pooler.supabase.com/postgres", {})).port).toBe(
+      "6543",
+    );
+    // Migrations are untouched.
+    expect(migrationDatabaseUrl({ DATABASE_URL: session })).toBe(session);
+  });
+
+  it("leaves other databases, transaction-mode URLs and the opt-out alone", () => {
+    const tx = supabase.POSTGRES_PRISMA_URL;
+    expect(preferTransactionPooler(tx, {})).toBe(tx);
+    expect(preferTransactionPooler("postgres://u:p@db.ref.supabase.co:5432/postgres", {})).toBe(
+      "postgres://u:p@db.ref.supabase.co:5432/postgres",
+    );
+    expect(preferTransactionPooler("postgres://u:p@localhost:5432/app", {})).toBe("postgres://u:p@localhost:5432/app");
+    const session = supabase.POSTGRES_URL_NON_POOLING;
+    expect(preferTransactionPooler(session, { DATABASE_POOLER_MODE: "session" })).toBe(session);
+    expect(preferTransactionPooler("not a url", {})).toBe("not a url");
   });
 });
