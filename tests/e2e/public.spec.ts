@@ -37,7 +37,7 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     expect(html).toContain('"@type":"LocalBusiness"');
     expect(html).toContain('"@type":"WebSite"');
     expect(html).toContain("https://www.instagram.com/mcpreps.mt/");
-    expect(html).toContain("Chicken Pokébowl");
+    expect(html).toContain("Chicken Poke Bowl");
   });
 
   test("every indexable page has a unique title, description, canonical and one H1", async ({ request, baseURL }) => {
@@ -106,6 +106,22 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     expect(await timer.textContent()).not.toBe(first); // ticking
     await page.reload();
     await expect(page.getByRole("timer").first()).toBeVisible(); // does not reset/disappear on refresh
+  });
+
+  test("the first-week offer's personal 2-hour window doesn't restart on reload", async ({ page }) => {
+    await page.goto("/menu");
+    const bar = page.locator('[data-promotion="first-week-6-euro"]').first();
+    await expect(bar).toBeVisible();
+    const toSeconds = (t: string | null) => {
+      const parts = (t ?? "").trim().split(":").map(Number);
+      return parts.reduce((acc, n) => acc * 60 + n, 0);
+    };
+    const first = toSeconds(await bar.getByRole("timer").textContent());
+    expect(first).toBeGreaterThan(60 * 60); // close to 2 hours on the first visit
+    await page.waitForTimeout(2100);
+    await page.reload();
+    const again = toSeconds(await page.locator('[data-promotion="first-week-6-euro"]').first().getByRole("timer").textContent());
+    expect(again).toBeLessThan(first); // counting down, not reset
   });
 
   test("unknown pages return a branded 404", async ({ request }) => {

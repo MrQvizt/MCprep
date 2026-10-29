@@ -5,7 +5,7 @@ import type { ContentOf } from "@/lib/content/schema";
 import type { PublicMeal } from "@/lib/public-data";
 import { cn } from "@/lib/utils";
 import { CtaLink } from "../cta-link";
-import { MealCard } from "../meal-card";
+import { MenuCard } from "../menu-card";
 import { MacroStrip } from "../nutrition";
 import { Reveal } from "../reveal";
 import { Section } from "../section";
@@ -110,9 +110,23 @@ export function HomeFeaturedMeals({
           >
             {meals.map((meal, i) => (
               <Reveal as="li" key={meal.id} delay={(i % 3) * 80}>
-                <MealCard meal={meal} className="h-full" />
+                <MenuCard meal={{ ...meal, image: meal.image ?? meal.images[0]?.mediaAsset ?? null }} index={i} total={meals.length} className="h-full" />
               </Reveal>
             ))}
+            <Reveal as="li" delay={(meals.length % 3) * 80} className={cn(meals.length % 3 === 0 && "sm:col-span-2 lg:col-span-3")}>
+              <div className="flex h-full min-h-56 flex-col justify-between gap-8 border border-white/15 p-6 sm:p-8">
+                <div>
+                  <p className="eyebrow text-fog">Your week, your mix</p>
+                  <p className="mt-4 font-display text-3xl font-black uppercase leading-[0.95]">Pick any combination</p>
+                  <p className="mt-3 max-w-sm text-sm text-white/70">
+                    Choose how many of each dish you want in your package — or mix them evenly in one tap.
+                  </p>
+                </div>
+                <CtaLink href="/order" className="self-start">
+                  Build your package
+                </CtaLink>
+              </div>
+            </Reveal>
           </ul>
         )}
       </div>

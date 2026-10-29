@@ -5,15 +5,15 @@ test.describe("admin portal", () => {
   test("owner can change a plan price and the public site updates", async ({ page }) => {
     await adminLogin(page, "/admin/plans");
     await expect(page).toHaveURL(/\/admin\/plans/);
-    await page.getByRole("link", { name: "2 Weeks" }).first().click();
+    await page.getByRole("link", { name: "Lunch · 5 days" }).first().click();
     await expect(page).toHaveURL(/\/admin\/plans\/[^/]+$/);
     const price = page.locator('input[name="price"]');
-    await price.fill("135.00");
+    await price.fill("55.00");
     await page.getByRole("button", { name: "Save plan" }).click();
     await expect(page.getByText(/saved|updated/i).first()).toBeVisible({ timeout: 15_000 });
 
     await page.goto("/plans");
-    await expect(page.locator("article", { hasText: "2 Weeks" }).first()).toContainText("€135");
+    await expect(page.locator('article[aria-label="Lunch · 5 days"]').first()).toContainText("€55 a week");
   });
 
   test("owner can edit a page's Google title", async ({ page, request }) => {
@@ -31,7 +31,7 @@ test.describe("admin portal", () => {
     for (const [path, text] of [
       ["/admin", /dashboard|welcome|orders/i],
       ["/admin/promotions", /Halloween/],
-      ["/admin/meals", /Chicken Pokébowl/],
+      ["/admin/meals", /Chicken Poke Bowl/],
       ["/admin/delivery", /Sliema/],
       ["/admin/seo", /Meal Prep Malta/],
       ["/admin/blog", /Meal Prep in Malta/],

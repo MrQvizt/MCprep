@@ -34,7 +34,7 @@ export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orde
     <AdminForm action={savePlan.bind(null, plan?.id ?? null)} className="space-y-6">
       <AdminCard title="Plan">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Plan name" name="name" required hint="e.g. 1 Week, 2 Weeks, 1 Month">
+          <Field label="Plan name" name="name" required hint="e.g. Lunch + Dinner · 5 days">
             {(id) => (
               <Input
                 id={id}
@@ -45,7 +45,7 @@ export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orde
               />
             )}
           </Field>
-          <Field label="Short code" name="slug" required hint="Used in order links, e.g. /order?plan=2-weeks">
+          <Field label="Short code" name="slug" required hint="Used in order links, e.g. /order?plan=lunch-dinner-5-days">
             {(id) => (
               <Input
                 id={id}

@@ -8,7 +8,7 @@ import { PlansGrid } from "@/components/public/home/fulfillment-plans";
 import { RichText } from "@/components/public/rich-text";
 import { Section } from "@/components/public/section";
 import { Breadcrumbs } from "@/components/public/breadcrumbs";
-import { Countdown } from "@/components/shared/countdown";
+import { PromoCountdown } from "@/components/public/promo-countdown";
 import { MediaImage } from "@/components/shared/media-image";
 import { getCurrentAdmin } from "@/lib/authz";
 import { formatPromoText } from "@/lib/promotions/format";
@@ -115,7 +115,7 @@ export default async function LandingPage({ params }: PageProps<"/offers/[slug]"
             </div>
             {mode === "live" && promotion?.showCountdown && (
               <div className="lg:justify-self-end">
-                <Countdown endsAt={promotion.endsAt} serverNow={now.toISOString()} />
+                <PromoCountdown endsAt={promotion.endsAt} personalWindowMinutes={promotion.personalWindowMinutes} serverNow={now.toISOString()} size="lg" />
               </div>
             )}
           </div>

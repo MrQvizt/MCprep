@@ -35,7 +35,7 @@ export default async function PlansPage() {
         }
       />
       {current.length === 0 ? (
-        <EmptyState icon={Tags} title="No plans yet" description="Create your 1-week, 2-week and 1-month plans." />
+        <EmptyState icon={Tags} title="No plans yet" description="Create your packages: lunch or lunch + dinner, 5 or 7 days, weekly or monthly." />
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
           {current.map((plan, i) => (

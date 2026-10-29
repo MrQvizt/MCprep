@@ -3,11 +3,13 @@ import { ClickTracking } from "@/components/public/click-tracking";
 import { CtaBand } from "@/components/public/cta-band";
 import { FaqList } from "@/components/public/faq-list";
 import { PlansGrid } from "@/components/public/home/fulfillment-plans";
+import { PackagesShowcase } from "@/components/public/package-card";
 import { PageHero } from "@/components/public/page-hero";
 import { PromoStrip } from "@/components/public/promo-strip";
 import { Section } from "@/components/public/section";
 import { getContent } from "@/lib/content";
 import { formatMoney } from "@/lib/money";
+import { isPackage, packageLabel, weeksInPeriod } from "@/lib/packages";
 import { getLivePublicPromotions } from "@/lib/promotions";
 import { crumbFor, getWhatsappHref } from "@/lib/public/page";
 import {
@@ -48,6 +50,9 @@ export default async function PlansPage() {
     (f) => f.category && ORDERING_CATEGORIES.has(f.category.toLowerCase()),
   );
   const shownFaqs = (orderingFaqs.length > 0 ? orderingFaqs : faqs).slice(0, 6);
+  const packages = plans.filter(isPackage);
+  const others = plans.filter((p) => !isPackage(p));
+  const money = (cents: number) => formatMoney(cents, currency, { hideZeroDecimals: true });
 
   return (
     <>
@@ -79,7 +84,10 @@ export default async function PlansPage() {
             what&apos;s available this week.
           </p>
         ) : (
-          <PlansGrid plans={plans} currency={currency} />
+          <>
+            {packages.length > 0 && <PackagesShowcase plans={packages} currency={currency} />}
+            {others.length > 0 && <PlansGrid plans={others} currency={currency} className={packages.length > 0 ? "mt-14" : undefined} />}
+          </>
         )}
         {content.note && (
           <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-fog">
@@ -87,63 +95,39 @@ export default async function PlansPage() {
           </p>
         )}
 
-        {plans.length > 1 && (
+        {packages.length > 1 && (
           <div className="mt-20 overflow-x-auto">
-            <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
-              <caption className="mb-5 text-left font-display text-2xl font-extrabold uppercase">
-                Compare plans
-              </caption>
+            <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+              <caption className="mb-5 text-left font-display text-2xl font-extrabold uppercase">Compare packages</caption>
               <thead>
                 <tr className="border-b border-white/20 text-xs uppercase tracking-[0.14em] text-fog">
-                  <th scope="col" className="py-3 pr-4 font-semibold">
-                    Plan
-                  </th>
-                  <th scope="col" className="py-3 pr-4 font-semibold">
-                    Duration
-                  </th>
-                  <th scope="col" className="py-3 pr-4 font-semibold">
-                    Meals included
-                  </th>
-                  <th scope="col" className="py-3 pr-4 font-semibold">
-                    Price
-                  </th>
-                  <th scope="col" className="py-3 font-semibold">
-                    Current offer
-                  </th>
+                  <th scope="col" className="py-3 pr-4 font-semibold">Package</th>
+                  <th scope="col" className="py-3 pr-4 font-semibold">Meals a week</th>
+                  <th scope="col" className="py-3 pr-4 font-semibold">Per meal</th>
+                  <th scope="col" className="py-3 pr-4 font-semibold">Price</th>
+                  <th scope="col" className="py-3 font-semibold">First-week offer</th>
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p) => (
+                {packages.map((p) => (
                   <tr key={p.id} className="border-b border-white/10">
-                    <th
-                      scope="row"
-                      className="py-4 pr-4 font-display text-base font-bold uppercase"
-                    >
-                      {p.name}
-                      {p.isRecommended && (
-                        <span className="ml-2 align-middle text-[0.6rem] tracking-[0.16em] text-fog">
-                          Recommended
-                        </span>
-                      )}
+                    <th scope="row" className="py-4 pr-4 font-display text-base font-bold uppercase">
+                      {packageLabel(p)}
+                      <span className="block text-[0.65rem] font-normal tracking-[0.16em] text-fog">
+                        {p.isSubscription ? "Monthly subscription" : "Weekly"}
+                        {p.isRecommended ? " · Most popular" : ""}
+                      </span>
                     </th>
-                    <td className="py-4 pr-4 tabular">{p.durationDays} days</td>
+                    <td className="py-4 pr-4 tabular">{p.mealsPerWeek}</td>
+                    <td className="py-4 pr-4 font-semibold tabular">{p.perMealCents === null ? "—" : money(p.perMealCents)}</td>
                     <td className="py-4 pr-4 tabular">
-                      {p.mealsIncluded ?? "Confirmed with you"}
-                    </td>
-                    <td className="py-4 pr-4 tabular">
-                      {p.priceCents === null
-                        ? "On request"
-                        : formatMoney(p.priceCents, currency)}
+                      {p.priceCents === null ? "On request" : `${money(p.priceCents)} ${p.isSubscription ? `/ ${weeksInPeriod(p)} weeks` : "/ week"}`}
                     </td>
                     <td className="py-4 tabular">
                       {p.offer ? (
                         <>
-                          {formatMoney(p.offer.priceCents, currency)}
-                          <span className="ml-2 text-xs text-fog">
-                            {p.offer.firstOrderOnly
-                              ? "first order"
-                              : p.offer.name}
-                          </span>
+                          {money(p.offer.priceCents)}
+                          <span className="ml-2 text-xs text-fog">{p.isSubscription ? `first ${weeksInPeriod(p)} weeks` : "first week"}</span>
                         </>
                       ) : (
                         <span className="text-fog">—</span>
@@ -201,8 +185,8 @@ export default async function PlansPage() {
         </Section>
       )}
       <CtaBand
-        title="Not sure which plan?"
-        body="Message us — we'll help you pick the plan that fits your training and schedule."
+        title="Not sure which package?"
+        body="Message us — we'll help you pick the package that fits your training and schedule."
         ctaLabel="See the menu"
         ctaHref="/menu"
         whatsappHref={whatsappHref}

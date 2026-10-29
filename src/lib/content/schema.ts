@@ -29,20 +29,29 @@ function list<T extends z.ZodTypeAny>(item: T, def: z.infer<T>[]) {
 // ── Homepage ────────────────────────────────────────────────────────────────
 
 export const homeHeroSchema = z.object({
-  kicker: text("Macro-tracked meal prep in Malta", 120),
+  kicker: text("High-protein meal prep in Malta", 120),
   headline: text("Fuel your lift.", 80),
-  subheadline: text("Fresh, macro-tracked meals built for your goals. Prepared in Malta.", 300),
-  primaryCta: cta("Explore meal plans", "/plans"),
-  secondaryCta: cta("View the menu", "/menu"),
+  subheadline: text(
+    "Macro-tracked lunches and dinners, cooked fresh. Build your package, pick your dishes — collect or get it delivered.",
+    300,
+  ),
+  primaryCta: cta("Build your package", "/order"),
+  secondaryCta: cta("See the menu", "/menu"),
   imageId: media(),
   imageAlt: text("MC PREPS meal prep — fresh, high-protein meals", 200),
-  proofPoints: list(z.string().max(60), ["High protein", "Macros listed", "Cooked fresh weekly", "Collection & delivery"]),
+  proofPoints: list(z.string().max(60), [
+    "High protein",
+    "Macros on every meal",
+    "Pick your dishes",
+    "Menu changes every few weeks",
+    "Collection & delivery",
+  ]),
 });
 
 export const homeIntroSchema = z.object({
   heading: text("Premium meal prep in Malta", 120),
   body: text(
-    "MC PREPS cooks high-protein, macro-counted meals fresh every week for lifters, athletes, active people and busy professionals in Malta.\n\nChoose a 1-week, 2-week or 1-month plan and send your order request online. Our team then contacts you personally to confirm your meals, collection or delivery, and payment — nothing is charged online.\n\nCalories and macros are listed for our meals, so tracking your intake is simple whether you're building strength, cutting, or just want to eat well without the weekly cooking marathon.",
+    "MC PREPS cooks high-protein, macro-counted meals fresh every week for lifters, athletes, active people and busy professionals in Malta.\n\nBuild your package — lunch, or lunch and dinner, five or seven days a week — pick your dishes from the current menu and send your request online. Our team then contacts you personally to confirm collection or delivery and payment. Nothing is charged online.\n\nCalories and macros are listed on every meal, so tracking your intake is simple whether you're building strength, cutting, or just want to eat well without the weekly cooking marathon.",
   ),
 });
 
@@ -59,19 +68,19 @@ export const homeBenefitsSchema = z.object({
 });
 
 export const homeFeaturedMealsSchema = z.object({
-  eyebrow: text("The menu", 60),
-  heading: text("Macro-tracked meals", 120),
-  subheading: text("Real food with the numbers on the label. Here's a taste of the menu.", 300),
-  ctaLabel: text("Explore all meals", 60),
+  eyebrow: text("On the menu", 60),
+  heading: text("This week's menu", 120),
+  subheading: text("Real food with the numbers on the label. The menu changes every few weeks.", 300),
+  ctaLabel: text("See the full menu", 60),
 });
 
 export const homeHowItWorksSchema = z.object({
   eyebrow: text("How it works", 60),
   heading: text("Three steps to a stocked fridge", 120),
   steps: list(textItem, [
-    { title: "Choose your plan", body: "Pick 1 week, 2 weeks or 1 month — whatever fits your goals and schedule." },
-    { title: "Submit your order request", body: "Tell us your details, preferences and whether you'd like collection or delivery. No payment is taken online." },
-    { title: "We contact you to confirm", body: "Our team gets in touch to confirm availability, collection or delivery details, and payment." },
+    { title: "Build your package", body: "Lunch, or lunch and dinner. Five or seven days a week. Weekly, or monthly and save." },
+    { title: "Pick your dishes", body: "Choose how many of each dish you'd like — or mix them evenly in one tap." },
+    { title: "We confirm, you eat well", body: "We contact you to confirm collection or delivery and payment. Nothing is charged online." },
   ]),
   note: text("Orders are requests until our team confirms them with you.", 300),
 });
@@ -87,9 +96,9 @@ export const homeFulfillmentSchema = z.object({
 });
 
 export const homePlansSchema = z.object({
-  eyebrow: text("Meal plans", 60),
-  heading: text("Choose your plan", 120),
-  subheading: text("Every plan starts as a request — we confirm the details with you before anything is paid.", 300),
+  eyebrow: text("Packages", 60),
+  heading: text("Build your package", 120),
+  subheading: text("Lunch, or lunch and dinner. Five or seven days. Weekly, or monthly and save — we confirm everything before anything is paid.", 300),
 });
 
 export const homeInstagramSchema = z.object({
@@ -110,8 +119,8 @@ export const homeTestimonialsSchema = z.object({
 
 export const homeFinalCtaSchema = z.object({
   headline: text("Your goals. Your fuel.", 80),
-  body: text("Pick a plan and send your order request in a couple of minutes. We'll take it from there.", 300),
-  cta: cta("Start your plan", "/plans"),
+  body: text("Build your package and pick your dishes in under two minutes. We'll take it from there.", 300),
+  cta: cta("Build your package", "/order"),
   imageId: media(),
 });
 
@@ -163,14 +172,15 @@ export const aboutPageSchema = z.object({
 
 export const howItWorksPageSchema = z.object({
   eyebrow: text("How it works", 60),
-  heading: text("From plan to plate", 120),
+  heading: text("From package to plate", 120),
   intro: text(
-    "Ordering from MC PREPS is simple and personal. You choose a plan and send a request — we confirm everything with you before your meals are prepared.",
+    "Ordering from MC PREPS is simple and personal. You build your package, pick your dishes and send a request — we confirm everything with you before your meals are prepared.",
     1200,
   ),
   steps: list(textItem, [
-    { title: "Choose your plan", body: "Compare our 1-week, 2-week and 1-month plans and pick the one that fits your routine." },
-    { title: "Send your order request", body: "Fill in your contact details, choose collection or delivery, and tell us about any preferences or allergies. It takes a couple of minutes." },
+    { title: "Build your package", body: "Lunch, or lunch and dinner. Five or seven days a week. Weekly, or subscribe monthly and save." },
+    { title: "Pick your dishes", body: "Choose how many of each dish on the current menu you'd like each week — or mix them evenly. The menu changes every few weeks." },
+    { title: "Send your order request", body: "Add your contact details, choose collection or delivery, and tell us about any preferences or allergies. It takes a couple of minutes." },
     { title: "We get in touch", body: "Our team contacts you by phone, WhatsApp or email to confirm availability, your start date, collection or delivery details, and payment." },
     { title: "Your meals are prepared", body: "Once confirmed, your meals are cooked fresh and ready for collection or delivery as agreed." },
   ]),
@@ -194,9 +204,9 @@ export const faqPageSchema = z.object({
 
 export const menuPageSchema = z.object({
   eyebrow: text("The menu", 60),
-  heading: text("Macro-tracked meals", 120),
+  heading: text("On the menu", 120),
   intro: text(
-    "High-protein meals cooked fresh in Malta, with calories and macros listed so you can plan your week around your goals.",
+    "High-protein meals cooked fresh in Malta, with calories and macros on every dish. Choose any mix of them in your package — the menu changes every few weeks.",
     1200,
   ),
   nutritionNote: text(
@@ -206,10 +216,10 @@ export const menuPageSchema = z.object({
 });
 
 export const plansPageSchema = z.object({
-  eyebrow: text("Plans & pricing", 60),
-  heading: text("Choose your plan", 120),
+  eyebrow: text("Packages & pricing", 60),
+  heading: text("Build your package", 120),
   intro: text(
-    "Three simple plans. Choose one, send your order request, and our team confirms the details with you before anything is paid.",
+    "Lunch, or lunch and dinner. Five or seven days a week. Pay weekly, or subscribe monthly and save. Choose your dishes, send your request — our team confirms everything with you before anything is paid.",
     1200,
   ),
   note: text("Prices are shown in euro. Any delivery fees are shown in your order summary when you choose your locality.", 600),
@@ -287,8 +297,8 @@ export const mealPrepMaltaSchema = servicePageSchema({
       body: "If you track your intake, you'll know how tedious weighing and logging every ingredient can be. Our meals list calories, protein, carbohydrates and fat, so you can log a meal in seconds and stay on target.",
     },
     {
-      heading: "Weekly plans that fit your routine",
-      body: "Choose a 1-week plan to try us out, a 2-week plan for a steady routine, or a 1-month plan if you want your nutrition sorted for longer. Each plan's inclusions and price are shown on our plans page.",
+      heading: "Packages that fit your routine",
+      body: "Lunch only, or lunch and dinner. Five or seven days a week. Pay week by week, or subscribe monthly for the lowest price per meal. Every package's price is shown on our packages page — and you choose your dishes from the current menu.",
     },
     {
       heading: "Collection or delivery in Malta",
@@ -298,15 +308,15 @@ export const mealPrepMaltaSchema = servicePageSchema({
   faqs: [
     {
       question: "How do I order meal prep from MC PREPS?",
-      answer: "Choose a plan, complete the order request form and submit it. No payment is taken online — our team contacts you to confirm the details and arrange payment.",
+      answer: "Build your package, pick your dishes and send the order request. No payment is taken online — our team contacts you to confirm the details and arrange payment.",
     },
     {
       question: "Can I tell you about allergies or preferences?",
       answer: "Yes. The order form has space for dietary preferences and allergies. We review them with you before your order is confirmed.",
     },
   ],
-  ctaLabel: "See meal plans",
-  ctaHref: "/plans",
+  ctaLabel: "Build your package",
+  ctaHref: "/order",
 });
 
 export const healthyMealDeliveryMaltaSchema = servicePageSchema({
@@ -348,38 +358,38 @@ export const healthyMealDeliveryMaltaSchema = servicePageSchema({
 
 export const mealPlansMaltaSchema = servicePageSchema({
   eyebrow: "Meal plans Malta",
-  h1: "Meal plans in Malta: 1 week, 2 weeks or 1 month",
+  h1: "Meal plans in Malta: lunch, or lunch and dinner",
   intro:
-    "Not sure which MC PREPS plan to pick? This guide explains how our plans work and who each one suits, so you can choose with confidence.",
+    "Not sure which MC PREPS package to pick? This guide explains how our packages work and who each one suits, so you can choose with confidence.",
   sections: [
     {
-      heading: "1-week plan: try it out",
-      body: "A good place to start if you're new to meal prep or want to see how our meals fit your routine before committing to longer.",
+      heading: "Lunch: weekdays or every day",
+      body: "Five or seven macro-tracked lunches a week. A great place to start if you're new to meal prep or only need your workday meals sorted.",
     },
     {
-      heading: "2-week plan: build the habit",
-      body: "Two weeks gives you enough time to settle into a routine and see how consistent eating fits around your training and work.",
+      heading: "Lunch + dinner: the full day sorted",
+      body: "Ten or fourteen meals a week — our most popular way to eat. Two meals a day off your mind, and a lower price per meal.",
     },
     {
-      heading: "1-month plan: set and forget",
-      body: "For people who want their weekday nutrition sorted for the month ahead, with fewer decisions to make each week.",
+      heading: "Monthly subscription: set and forget",
+      body: "Lunch and dinner for four weeks at a time, billed monthly, at our lowest price per meal. Ideal if you want your nutrition sorted with fewer decisions each week.",
     },
     {
       heading: "How ordering works",
-      body: "Every plan starts as an order request. Once you submit it, our team contacts you to confirm your meals, start date, collection or delivery, and payment. If a genuine limited-time offer is running, its price and real end date are shown on the plan cards.",
+      body: "Build your package, pick your dishes and send your order request. Our team contacts you to confirm your start date, collection or delivery, and payment. If a genuine offer is running, its price and real deadline are shown on the package cards.",
     },
   ],
   faqs: [
     {
-      question: "Can I change plans later?",
-      answer: "Talk to us when we confirm your order — we'll help you find the plan that fits.",
+      question: "Can I change my package later?",
+      answer: "Yes — tell us when we confirm your order, or any time after. We'll move you to the package that fits.",
     },
     {
       question: "Are prices final when I submit my request?",
       answer: "The price shown is your quote. Our team confirms the final amount with you — for example, new-customer offers are verified before they're applied.",
     },
   ],
-  ctaLabel: "Compare plans",
+  ctaLabel: "Compare packages",
   ctaHref: "/plans",
 });
 
@@ -556,7 +566,7 @@ export const CONTENT_LABELS: Record<ContentKey, string> = {
   "page.contact": "Contact page",
   "page.faq": "FAQ page",
   "page.menu": "Menu page",
-  "page.plans": "Plans & Pricing page",
+  "page.plans": "Packages & Pricing page",
   "page.gallery": "Gallery page",
   "page.offers": "Offers page",
   "page.deliveryAreas": "Delivery Areas page",

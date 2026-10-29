@@ -51,8 +51,8 @@ export default async function LocalityPage({ params }: PageProps<"/delivery-area
         title={`Meal prep in ${area.name}`}
         intro={area.pageIntro}
       >
-        <CtaLink href="/plans" size="lg">
-          Choose your plan
+        <CtaLink href="/order" size="lg">
+          Build your package
         </CtaLink>
       </PageHero>
       <Section tone="paper" aria-label={`Delivery in ${area.name}`}>

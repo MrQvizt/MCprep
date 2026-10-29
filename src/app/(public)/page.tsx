@@ -10,6 +10,7 @@ import { TrackInView } from "@/components/public/track-in-view";
 import { JsonLd } from "@/components/shared/json-ld";
 import { getContents } from "@/lib/content";
 import { getMedia } from "@/lib/media";
+import { formatMoney } from "@/lib/money";
 import { getHomepagePromotion } from "@/lib/promotions";
 import { getJsonLdContext, getLocalBusinessExtras } from "@/lib/public/data";
 import {
@@ -19,6 +20,7 @@ import {
   getGalleryItems,
   getPublicPlans,
   getPublishedFaqs,
+  getPublishedMeals,
   getPublishedTestimonials,
   requestNow,
 } from "@/lib/public-data";
@@ -69,6 +71,12 @@ export default async function HomePage() {
     getLocalBusinessExtras(),
   ]);
 
+  const menu = await getPublishedMeals();
+  const perMeal = plans.map((p) => p.perMealCents).filter((v): v is number => v !== null);
+  const fromPerMealCents = perMeal.length ? Math.min(...perMeal) : null;
+  const proteins = menu.map((m) => m.proteinG).filter((v): v is number => v !== null);
+  const maxProtein = proteins.length ? Math.max(...proteins) : null;
+
   const c = settings.contact;
   const whatsappHref = whatsappLink(c.whatsappNumber, c.whatsappDefaultMessage);
   const instagramUrl = isInstagramUrl(c.instagramUrl) ? c.instagramUrl : null;
@@ -83,7 +91,13 @@ export default async function HomePage() {
     <>
       <JsonLd data={jsonLd} />
       <ClickTracking />
-      <HomeHero hero={hero} image={heroImage} spotlight={meals[0] ?? null} />
+      <HomeHero
+        hero={hero}
+        image={heroImage}
+        meals={menu.map((m) => ({ ...m, image: m.image ?? m.images[0]?.mediaAsset ?? null }))}
+        fromPerMeal={fromPerMealCents !== null ? formatMoney(fromPerMealCents, currency, { hideZeroDecimals: true }) : null}
+        maxProtein={maxProtein}
+      />
       <HomeIntro intro={intro} />
       {sections.showBenefits && <HomeBenefits benefits={benefits} />}
       {sections.showFeaturedMeals && <HomeFeaturedMeals content={featuredMeals} meals={meals} />}
@@ -104,7 +118,7 @@ export default async function HomePage() {
       {sections.showTestimonials && <HomeTestimonials content={testimonialsContent} items={testimonials} />}
       {sections.showFaq && <HomeFaq content={faqContent} faqs={faqs} whatsappHref={whatsappHref} />}
       {sections.showFinalCta && <HomeFinalCta content={finalCta} whatsappHref={whatsappHref} />}
-      <StickyCta href="/plans" label="Choose your plan" note="No payment taken online" />
+      <StickyCta href="/order" label="Build your package" note={fromPerMealCents !== null ? `From ${formatMoney(fromPerMealCents, currency, { hideZeroDecimals: true })} a meal · no payment online` : "No payment taken online"} />
     </>
   );
 }

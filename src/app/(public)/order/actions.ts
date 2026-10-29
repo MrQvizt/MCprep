@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/actions";
 import { processOutbox } from "@/lib/email/outbox";
 import { orderRequestSchema, quoteRequestSchema, type OrderRequestInput, type QuoteRequest } from "@/lib/orders/schema";
-import { ensureOfferWindowStarted, getOfferWindowStart } from "@/lib/offer-window-server";
+import { getOfferWindowStart } from "@/lib/offer-window-server";
 import { createOrderRequest, OrderValidationError, quoteForOrder } from "@/lib/orders/service";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/request";
@@ -23,16 +23,6 @@ export async function getQuoteAction(input: QuoteRequest): Promise<QuoteView | n
   const qc = await quoteForOrder({ ...parsed.data, now, offerWindowStartedAt: await getOfferWindowStart(now) });
   if (!qc) return null;
   return toQuoteView(qc);
-}
-
-/**
- * Start this visitor's personal offer window (e.g. "order within 2 hours")
- * the first time they see the offer. Never restarts an existing window.
- */
-export async function startOfferWindowAction(): Promise<{ startedAt: string; serverNow: string } | null> {
-  const now = new Date();
-  const started = await ensureOfferWindowStarted(now);
-  return started ? { startedAt: started.toISOString(), serverNow: now.toISOString() } : null;
 }
 
 const GENERIC_ERROR = "We couldn't send your order request. Please try again, or message us on WhatsApp.";

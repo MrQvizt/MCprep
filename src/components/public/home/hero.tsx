@@ -1,12 +1,10 @@
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import type { ContentOf } from "@/lib/content/schema";
 import type { MediaRef } from "@/lib/media";
-import type { PublicMeal } from "@/lib/public-data";
 import { isSafeHref } from "@/lib/urls";
 import { CtaLink } from "../cta-link";
-import { MacroStrip } from "../nutrition";
+import type { MenuCardMeal } from "../menu-card";
+import { HeroMenuCarousel } from "./hero-menu-carousel";
 
 function HeroArt() {
   return (
@@ -33,39 +31,29 @@ function HeroArt() {
   );
 }
 
-function Spotlight({ meal }: { meal: PublicMeal }) {
-  return (
-    <aside
-      aria-label="On the menu"
-      className="hidden w-[22rem] border border-white/15 bg-ink/60 p-6 backdrop-blur-md lg:block"
-    >
-      <p className="eyebrow flex items-center justify-between text-fog">
-        On the menu <span className="text-white/40">Macros listed</span>
-      </p>
-      <p className="mt-4 font-display text-2xl font-extrabold uppercase leading-none">{meal.name}</p>
-      <MacroStrip meal={meal} compact className="mt-5" />
-      <Link
-        href={`/menu/${meal.slug}`}
-        className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] hover:underline underline-offset-4"
-      >
-        View meal <ArrowUpRight className="size-3.5" />
-      </Link>
-    </aside>
-  );
-}
-
 export function HomeHero({
   hero,
   image,
-  spotlight,
+  meals,
+  fromPerMeal,
+  maxProtein,
 }: {
   hero: ContentOf<"home.hero">;
   image: MediaRef | null;
-  spotlight: PublicMeal | null;
+  meals: MenuCardMeal[];
+  /** Cheapest price per meal across packages, formatted (e.g. "€8.04"). */
+  fromPerMeal: string | null;
+  maxProtein: number | null;
 }) {
-  const primary = isSafeHref(hero.primaryCta.href) ? hero.primaryCta : { label: "Explore meal plans", href: "/plans" };
-  const secondary = isSafeHref(hero.secondaryCta.href) ? hero.secondaryCta : { label: "View the menu", href: "/menu" };
+  const primary = isSafeHref(hero.primaryCta.href) ? hero.primaryCta : { label: "Build your package", href: "/order" };
+  const secondary = isSafeHref(hero.secondaryCta.href) ? hero.secondaryCta : { label: "See the menu", href: "/menu" };
   const points = hero.proofPoints.filter(Boolean);
+  const facts = [
+    fromPerMeal ? { value: fromPerMeal, label: "a meal, from" } : null,
+    maxProtein ? { value: `${Math.round(maxProtein)}g`, label: "protein, up to" } : null,
+    meals.length > 0 ? { value: String(meals.length), label: "dishes on the menu" } : null,
+  ].filter((f): f is { value: string; label: string } => f !== null);
+
   return (
     <section aria-labelledby="hero-title" className="relative isolate overflow-hidden bg-ink text-white">
       <div className="absolute inset-0 -z-10">
@@ -80,41 +68,52 @@ export function HomeHero({
               quality={75}
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-ink/35" />
+            <div className="absolute inset-0 bg-ink/55" />
           </>
         ) : (
           <HeroArt />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/45 to-ink/0" />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/75 via-ink/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-ink/0" />
       </div>
 
-      <div className="container-site flex min-h-[calc(92svh-4rem)] flex-col justify-end pb-12 pt-20 sm:pb-16 lg:min-h-[calc(94svh-5rem)] lg:pb-20">
-        <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="max-w-5xl">
-            <h1 id="hero-title">
-              <span className="eyebrow flex items-center gap-3 text-white/85 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                <span aria-hidden="true" className="h-px w-10 bg-white" />
-                {hero.kicker}
-              </span>
-              <span className="mt-6 block display-2xl text-balance animate-in fade-in slide-in-from-bottom-4 duration-1000 [animation-fill-mode:both] [animation-delay:80ms]">
-                {hero.headline}
-              </span>
-            </h1>
-            <p className="mt-7 max-w-xl text-lg leading-relaxed text-white/80 sm:text-xl text-pretty animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:200ms]">
-              {hero.subheadline}
-            </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:300ms]">
-              <CtaLink href={primary.href} size="lg">
-                {primary.label}
-              </CtaLink>
-              <CtaLink href={secondary.href} size="lg" variant="outline" className="border-white/40">
-                {secondary.label}
-              </CtaLink>
-            </div>
+      <div className="container-site grid gap-12 pb-14 pt-12 sm:pt-16 lg:min-h-[calc(92svh-5rem)] lg:grid-cols-12 lg:items-center lg:gap-10 lg:pb-20">
+        <div className="lg:col-span-7">
+          <h1 id="hero-title">
+            <span className="eyebrow flex items-center gap-3 text-white/85 animate-in fade-in slide-in-from-bottom-2 duration-700">
+              <span aria-hidden="true" className="h-px w-10 bg-white" />
+              {hero.kicker}
+            </span>
+            <span className="mt-6 block display-2xl text-balance animate-in fade-in slide-in-from-bottom-4 duration-1000 [animation-fill-mode:both] [animation-delay:80ms]">
+              {hero.headline}
+            </span>
+          </h1>
+          <p className="mt-7 max-w-xl text-lg leading-relaxed text-white/80 sm:text-xl text-pretty animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:200ms]">
+            {hero.subheadline}
+          </p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:300ms]">
+            <CtaLink href={primary.href} size="lg" data-track="hero_primary_cta">
+              {primary.label}
+            </CtaLink>
+            <CtaLink href={secondary.href} size="lg" variant="outline" className="border-white/40">
+              {secondary.label}
+            </CtaLink>
           </div>
-          {spotlight && <Spotlight meal={spotlight} />}
+          {facts.length > 0 && (
+            <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-white/15 pt-6 animate-in fade-in duration-1000 [animation-fill-mode:both] [animation-delay:400ms]">
+              {facts.map((f) => (
+                <div key={f.label} className="flex flex-col-reverse">
+                  <dt className="mt-1 text-[0.62rem] uppercase tracking-[0.18em] text-white/55">{f.label}</dt>
+                  <dd className="font-display text-3xl font-black tabular leading-none sm:text-4xl">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
+        {meals.length > 0 && (
+          <div className="mx-auto w-full max-w-[26rem] lg:col-span-5 lg:mr-0 animate-in fade-in slide-in-from-bottom-6 duration-1000 [animation-fill-mode:both] [animation-delay:250ms]">
+            <HeroMenuCarousel meals={meals} />
+          </div>
+        )}
       </div>
 
       {points.length > 0 && (

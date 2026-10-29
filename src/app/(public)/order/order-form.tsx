@@ -14,7 +14,8 @@ import { orderFormSchema, type OrderFormInput, type OrderFormValues, type OrderR
 import { evenSplit, isPackage, mealSelectionProblem, packageLabel, selectionTotal, type MealChoice } from "@/lib/packages";
 import { formatCalendarDate, formatWeekdays } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { getQuoteAction, startOfferWindowAction, submitOrderAction, type QuoteView } from "./actions";
+import { startOfferWindowAction } from "../offer-actions";
+import { getQuoteAction, submitOrderAction, type QuoteView } from "./actions";
 import { DishPicker, type DishOption } from "./dish-picker";
 import { PackageBuilder } from "./package-builder";
 

@@ -17,8 +17,8 @@ export interface NavItem {
 export function SiteHeader({
   brand,
   nav,
-  ctaLabel = "Order now",
-  ctaHref = "/plans",
+  ctaLabel = "Build your package",
+  ctaHref = "/order",
   whatsappHref,
   instagramUrl,
 }: {
