@@ -249,8 +249,24 @@ ${pricing}
 
 // ── Customer confirmation ───────────────────────────────────────────────────
 
-export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): RenderedEmail {
+/** Account link: the customer's account, or sign-up pre-filled from this order. */
+export interface CustomerAccountLink {
+  url: string;
+  saved: boolean;
+}
+
+export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand, account?: CustomerAccountLink): RenderedEmail {
   const firstName = o.customerName.split(/\s+/)[0] || o.customerName;
+  const accountHtml = account
+    ? account.saved
+      ? `<p style="margin:16px 0 0;">This order is saved in <a href="${escapeHtml(account.url)}" style="color:#080808;">your account</a>, where you can order it again any time.</p>`
+      : `<p style="margin:16px 0 0;"><strong>Order again in two taps:</strong> <a href="${escapeHtml(account.url)}" style="color:#080808;">create a free account</a> to save this order and keep your details filled in.</p>`
+    : "";
+  const accountText = account
+    ? account.saved
+      ? `This order is saved in your account: ${account.url}`
+      : `Order again in two taps — create a free account to save this order: ${account.url}`
+    : null;
   const subject = safeHeader(`We've received your order request — ${o.reference}`);
   const promoNote =
     o.promotionName && o.promotionRequiresVerification
@@ -286,6 +302,7 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
 <p style="margin:0 0 12px;">Your order request <strong>${escapeHtml(o.reference)}</strong> is pending confirmation. <strong>No payment has been taken.</strong> Our team will contact you to confirm availability, ${o.fulfillmentMethod === "DELIVERY" ? "delivery" : "collection"} details and payment.</p>
 ${promoNote}${allergyNote}
 ${table(pricingRows)}
+${accountHtml}
 ${contactLines.length ? `<p style="margin:16px 0 0;">Questions? Reach us via ${contactLines.join(" · ")}.</p>` : ""}`,
   );
 
@@ -307,6 +324,7 @@ ${contactLines.length ? `<p style="margin:16px 0 0;">Questions? Reach us via ${c
       [o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency)],
       ["Then", renewalNote(o)],
     ]),
+    accountText ? `\n${accountText}` : null,
     brand.publicEmail ? `\nQuestions? Email ${brand.publicEmail}` : "",
   ]
     .filter((l) => l !== null)

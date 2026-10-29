@@ -135,6 +135,15 @@ describe("customer accounts", () => {
     const a = await account();
     const o = await order("different.address@example.com", a.id);
     expect((await getAccountOrders(a.id)).map((x) => x.reference)).toEqual([o.reference]);
+    const mail = await db.emailOutbox.findFirstOrThrow({ where: { orderId: o.orderId, type: "ORDER_CUSTOMER_CONFIRMATION" } });
+    expect(mail.text).toContain("This order is saved in your account: https://mcpreps.test/account");
+  });
+
+  it("invites guests to save the order to a new account in the confirmation email", async () => {
+    const o = await order();
+    const mail = await db.emailOutbox.findFirstOrThrow({ where: { orderId: o.orderId, type: "ORDER_CUSTOMER_CONFIRMATION" } });
+    expect(mail.text).toContain(`https://mcpreps.test/account/sign-up?ref=${o.reference}&t=${o.token}`);
+    expect(mail.html).toContain("create a free account");
   });
 
   it("deleting an account needs the password and keeps the orders", async () => {

@@ -589,7 +589,15 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
           });
         }
         if (settings.orderForm.sendCustomerConfirmation) {
-          const customerEmail = renderCustomerOrderEmail(emailData, brand);
+          const account = ctx.accountId
+            ? { url: absoluteUrl("/account"), saved: true }
+            : {
+                url: absoluteUrl(
+                  `/account/sign-up?ref=${encodeURIComponent(order.reference)}&t=${confirmationToken(order.id, order.idempotencyKey)}`,
+                ),
+                saved: false,
+              };
+          const customerEmail = renderCustomerOrderEmail(emailData, brand, account);
           emails.push({
             type: "ORDER_CUSTOMER_CONFIRMATION",
             dedupeKey: `order:${order.id}:customer`,
