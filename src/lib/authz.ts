@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { AdminRole } from "@/generated/prisma/client";
@@ -39,9 +40,18 @@ export function hasRole(role: AdminRole, minRole: AdminRole): boolean {
  * immediately (session version must match).
  */
 export const getCurrentAdmin = cache(async (): Promise<CurrentAdmin | null> => {
-  const session = await auth();
+  let session: Session | null;
+  try {
+    session = await auth();
+  } catch (error) {
+    // Let Next.js internal signals (dynamic rendering, redirects) propagate.
+    unstable_rethrow(error);
+    // e.g. AUTH_SECRET missing — treat as signed out rather than breaking public pages.
+    console.error("[auth] could not read session", error);
+    return null;
+  }
   const id = session?.user?.id;
-  if (!id) return null;
+  if (!session || !id) return null;
   const user = await db.adminUser.findUnique({
     where: { id },
     select: { id: true, email: true, name: true, role: true, isActive: true, sessionVersion: true },

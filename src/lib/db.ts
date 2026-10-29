@@ -1,12 +1,13 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { runtimeDatabaseUrl, withNodePostgresSslCompat } from "@/lib/database-url";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_URL is not set");
-  const adapter = new PrismaPg({ connectionString });
+  const url = runtimeDatabaseUrl();
+  if (!url) throw new Error("No database configured: set DATABASE_URL (or connect the Supabase/Postgres integration).");
+  const adapter = new PrismaPg({ connectionString: withNodePostgresSslCompat(url) });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
@@ -20,7 +21,7 @@ function getClient(): PrismaClient {
 
 /**
  * Prisma client, created on first use. Importing this module never touches
- * the database or requires DATABASE_URL, so `next build` works on build
+ * the database or requires a database URL, so `next build` works on build
  * machines without database access; requests fail clearly if it's missing.
  */
 export const db: PrismaClient = new Proxy({} as PrismaClient, {

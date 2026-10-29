@@ -27,6 +27,9 @@ import {
 } from "./seed-content";
 
 const demo = process.env.SEED_PROFILE === "demo";
+/** SEED_ONCE=1 (used by the Vercel build): seed starter content only on the first run. */
+const once = process.env.SEED_ONCE === "1";
+const SEED_MARKER_KEY = "_seed";
 const log = (msg: string) => console.log(`  • ${msg}`);
 
 if (demo && process.env.NODE_ENV === "production") {
@@ -106,6 +109,11 @@ async function seedFaqs() {
 
 async function seedGallery() {
   if ((await db.galleryItem.count()) > 0) return;
+  // Placeholder tiles need persistent storage; local disk on Vercel isn't kept.
+  if (process.env.VERCEL && (process.env.STORAGE_DRIVER ?? "local") === "local") {
+    log("Gallery placeholders skipped (configure S3/R2 storage, then upload real photos)");
+    return;
+  }
   for (const [i, word] of GALLERY_WORDS.entries()) {
     const buffer = await placeholderTile(word, i);
     const asset = await createMediaAsset({
@@ -261,6 +269,12 @@ async function seedAdmin() {
 
 async function main() {
   console.log(`Seeding MC PREPS (${demo ? "DEMO profile" : "brand-safe profile"})…`);
+  if (once && (await db.siteSetting.findUnique({ where: { key: SEED_MARKER_KEY } }))) {
+    // Starter content was already added once; never re-create content the owner removed.
+    await seedAdmin();
+    console.log("Starter content already seeded — skipped.");
+    return;
+  }
   await seedPlans();
   await seedMeals();
   await seedFaqs();
@@ -270,6 +284,11 @@ async function main() {
   await seedListings();
   await seedBlog();
   await seedAdmin();
+  await db.siteSetting.upsert({
+    where: { key: SEED_MARKER_KEY },
+    create: { key: SEED_MARKER_KEY, value: { seededAt: new Date().toISOString(), profile: demo ? "demo" : "brand-safe" } },
+    update: {},
+  });
   console.log("Done.");
 }
 

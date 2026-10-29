@@ -38,7 +38,7 @@ export default async function LaunchPage({ searchParams }: PageProps<"/admin/lau
   const devChecks = [
     { label: "Database connected", ok: true },
     { label: "Session secret (AUTH_SECRET)", ok: Boolean(e.AUTH_SECRET) },
-    { label: "Website address (NEXT_PUBLIC_SITE_URL)", ok: e.NEXT_PUBLIC_SITE_URL.startsWith("https://"), value: e.NEXT_PUBLIC_SITE_URL },
+    { label: "Website address (NEXT_PUBLIC_SITE_URL)", ok: Boolean(e.NEXT_PUBLIC_SITE_URL?.startsWith("https://")), value: e.NEXT_PUBLIC_SITE_URL ?? "not set" },
     { label: "Email provider (RESEND_API_KEY + EMAIL_FROM)", ok: transport === "resend" && Boolean(e.EMAIL_FROM), value: transport },
     { label: "Image storage (STORAGE_DRIVER)", ok: e.STORAGE_DRIVER === "s3", value: e.STORAGE_DRIVER },
     { label: "Scheduled jobs secret (CRON_SECRET)", ok: Boolean(e.CRON_SECRET) },

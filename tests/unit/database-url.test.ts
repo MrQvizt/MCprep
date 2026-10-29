@@ -1,0 +1,41 @@
+import { describe, expect, it } from "vitest";
+import { migrationDatabaseUrl, runtimeDatabaseUrl, withNodePostgresSslCompat } from "@/lib/database-url";
+
+const supabase = {
+  POSTGRES_PRISMA_URL: "postgres://u:p@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true",
+  POSTGRES_URL: "postgres://u:p@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require",
+  POSTGRES_URL_NON_POOLING: "postgres://u:p@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require",
+};
+
+describe("database URLs", () => {
+  it("prefers DATABASE_URL, with DIRECT_DATABASE_URL for migrations", () => {
+    const env = { DATABASE_URL: "postgres://a/app", DIRECT_DATABASE_URL: "postgres://a/direct", ...supabase };
+    expect(runtimeDatabaseUrl(env)).toBe("postgres://a/app");
+    expect(migrationDatabaseUrl(env)).toBe("postgres://a/direct");
+    expect(migrationDatabaseUrl({ DATABASE_URL: "postgres://a/app" })).toBe("postgres://a/app");
+  });
+
+  it("uses Vercel's Supabase integration variables when DATABASE_URL is absent", () => {
+    expect(runtimeDatabaseUrl(supabase)).toBe(supabase.POSTGRES_PRISMA_URL);
+    expect(migrationDatabaseUrl(supabase)).toBe(supabase.POSTGRES_URL_NON_POOLING);
+  });
+
+  it("returns undefined when nothing is configured (build machines)", () => {
+    expect(runtimeDatabaseUrl({})).toBeUndefined();
+    expect(migrationDatabaseUrl({ DATABASE_URL: "  " })).toBeUndefined();
+  });
+
+  it("keeps sslmode=require meaning 'encrypted' for node-postgres and drops pgbouncer hints", () => {
+    const out = new URL(withNodePostgresSslCompat(supabase.POSTGRES_PRISMA_URL));
+    expect(out.searchParams.get("sslmode")).toBe("require");
+    expect(out.searchParams.get("uselibpqcompat")).toBe("true");
+    expect(out.searchParams.has("pgbouncer")).toBe(false);
+    // Explicit verification modes are respected.
+    const strict = withNodePostgresSslCompat("postgres://u:p@h:5432/db?sslmode=verify-full");
+    expect(new URL(strict).searchParams.has("uselibpqcompat")).toBe(false);
+    // Local URLs without SSL are unchanged.
+    expect(withNodePostgresSslCompat("postgresql://u:p@localhost:5432/db?schema=public")).toBe(
+      "postgresql://u:p@localhost:5432/db?schema=public",
+    );
+  });
+});

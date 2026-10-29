@@ -8,8 +8,10 @@ const optionalString = z
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional().or(z.literal("").transform(() => undefined)),
+  VERCEL_PROJECT_PRODUCTION_URL: optionalString,
+  VERCEL_BRANCH_URL: optionalString,
+  VERCEL_URL: optionalString,
   VERCEL_ENV: optionalString,
   /** "true" forces indexing on, "false" forces it off (preview/staging). */
   ALLOW_INDEXING: optionalString,
@@ -51,8 +53,18 @@ export function env(): ServerEnv {
   return cached;
 }
 
+/**
+ * Public address of the site. NEXT_PUBLIC_SITE_URL wins; on Vercel the
+ * production domain / preview URL is used when it isn't set.
+ */
 export function siteUrl(): string {
-  return env().NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  const e = env();
+  const fromVercel =
+    e.VERCEL_ENV === "production"
+      ? e.VERCEL_PROJECT_PRODUCTION_URL
+      : (e.VERCEL_BRANCH_URL ?? e.VERCEL_URL);
+  const url = e.NEXT_PUBLIC_SITE_URL ?? (fromVercel ? `https://${fromVercel}` : "http://localhost:3000");
+  return url.replace(/\/$/, "");
 }
 
 export function absoluteUrl(path = "/"): string {

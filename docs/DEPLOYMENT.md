@@ -13,6 +13,30 @@ region) + **Resend** (email) + **Cloudflare R2** or **AWS S3** (images). Any Nod
 | Domain registrar | Your web address (e.g. `mcpreps.mt` / `mcpreps.com`) | DNS access |
 | Vercel | Hosting, HTTPS, cron | — |
 
+## Quick path: Vercel + Supabase integration
+
+If the Supabase database is connected to the Vercel project through the official integration, the database
+variables (`POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`, …) are added automatically and **no
+`DATABASE_URL` is needed**. Every deploy then:
+
+1. applies pending database migrations (`prisma migrate deploy` — never resets or deletes data),
+2. on the very first deploy only, adds the brand-safe starter content,
+3. builds the site (`npm run vercel-build`, run automatically by Vercel).
+
+Add these variables in Vercel → Settings → Environment Variables, then redeploy:
+
+| Variable | Value |
+| --- | --- |
+| `AUTH_SECRET` | output of `openssl rand -base64 32` (required for admin sign-in) |
+| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` | your owner login (password ≥ 12 characters). Created on the next deploy; remove these variables after you've signed in and changed your password |
+| `NEXT_PUBLIC_SITE_URL` | your final domain once you have it (until then the Vercel URL is used) |
+| `CRON_SECRET` | output of `openssl rand -hex 24` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | order emails (they wait in the queue until configured) |
+| `STORAGE_DRIVER=s3` + `S3_*` + `MEDIA_PUBLIC_BASE_URL` | photo uploads (Supabase Storage's S3 endpoint, Cloudflare R2 or AWS S3) |
+
+Preview deployments use the same database unless you give them their own, so test on previews with care.
+Set `SKIP_DB_MIGRATIONS=1` on an environment to stop automatic migrations there.
+
 ## 2. Configure environment variables
 
 Copy every variable from `.env.example` into **Vercel → Project → Settings → Environment Variables** (Production,

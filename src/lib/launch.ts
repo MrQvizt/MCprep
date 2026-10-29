@@ -200,7 +200,7 @@ export async function getLaunchReadiness(now: Date = new Date()) {
     sitemapDetail = error instanceof Error ? error.message.slice(0, 120) : "Error";
   }
 
-  const siteUrl = e.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = e.NEXT_PUBLIC_SITE_URL ?? "";
   const httpsDomain = siteUrl.startsWith("https://") && !isLocalHost(siteUrl);
   const vercelDomain = /\.vercel\.app$/i.test((() => {
     try {
