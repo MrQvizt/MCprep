@@ -1,4 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { attachDatabasePool } from "@vercel/functions";
+import { Pool } from "pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { runtimeDatabaseUrl, withNodePostgresSslCompat } from "@/lib/database-url";
 
@@ -7,7 +9,18 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 function createClient() {
   const url = runtimeDatabaseUrl();
   if (!url) throw new Error("No database configured: set DATABASE_URL (or connect the Supabase/Postgres integration).");
-  const adapter = new PrismaPg({ connectionString: withNodePostgresSslCompat(url) });
+  const pool = new Pool({
+    connectionString: withNodePostgresSslCompat(url),
+    // Per server instance. Many instances can run at once, and the database
+    // (or its pooler) only accepts a limited number of connections in total.
+    max: 5,
+    idleTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 10_000,
+  });
+  // On Vercel, keeps the function alive until idle connections are closed, so
+  // a suspended instance doesn't hold them. Does nothing elsewhere.
+  attachDatabasePool(pool);
+  const adapter = new PrismaPg(pool, { disposeExternalPool: true });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
