@@ -1,0 +1,972 @@
+// MC PREPS — database schema
+//
+// Conventions
+// - All money is stored as integer minor units (euro cents) in *Cents columns.
+// - All timestamps are stored in UTC (timestamptz). Rendering converts to the
+//   configured business time zone (default Europe/Malta).
+// - Orders keep a permanent snapshot of plan, pricing, promotion and
+//   fulfilment details, so later edits/deletes of public content never change
+//   an existing order.
+// - Content models use archive/unpublish flags instead of hard deletes when
+//   they can be referenced by orders.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin users, auth & audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AdminRole {
+  OWNER // everything, including managing other admin accounts
+  ADMIN // everything except managing admin accounts
+  EDITOR // content, media, SEO and blog only — no customer data or settings
+}
+
+model AdminUser {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  passwordHash   String
+  role           AdminRole @default(ADMIN)
+  isActive       Boolean   @default(true)
+  // Incremented on password change / deactivation to revoke existing sessions.
+  sessionVersion Int       @default(1)
+  lastLoginAt    DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  auditLogs          AuditLog[]
+  statusChanges      OrderStatusHistory[]
+  orderNotes         OrderNote[]
+  uploadedMedia      MediaAsset[]
+  eligibilityReviews PromotionEligibilityReview[]
+}
+
+model AuditLog {
+  id         String     @id @default(cuid())
+  actorId    String?
+  actor      AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorEmail String? // snapshot, survives account deletion
+  action     String // e.g. "plan.update", "order.status", "promotion.create"
+  entityType String
+  entityId   String?
+  summary    String
+  changes    Json?
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// Fixed-window counters used for rate limiting (login, order form, events).
+model RateLimit {
+  key     String   @id
+  count   Int
+  resetAt DateTime @db.Timestamptz(3)
+
+  @@index([resetAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Media
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MediaCategory {
+  GENERAL
+  MEAL
+  HERO
+  GALLERY
+  BLOG
+  BRANDING
+  SOCIAL
+  PROMOTION
+  TESTIMONIAL
+}
+
+model MediaAsset {
+  id           String        @id @default(cuid())
+  storageKey   String        @unique
+  url          String
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  altText      String?
+  caption      String?
+  category     MediaCategory @default(GENERAL)
+  isPlaceholder Boolean      @default(false) // generated placeholder art, replace before launch
+  uploadedById String?
+  uploadedBy   AdminUser?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  mealsPrimary       Meal[]                        @relation("MealPrimaryImage")
+  mealImages         MealImage[]
+  galleryItems       GalleryItem[]
+  promotions         Promotion[]
+  blogCovers         BlogPost[]                    @relation("BlogCover")
+  blogOgImages       BlogPost[]                    @relation("BlogOgImage")
+  seoOgImages        SEOPageMetadata[]
+  testimonials       Testimonial[]
+  landingHeroes      SeasonalCampaignLandingPage[] @relation("LandingHero")
+  landingOgImages    SeasonalCampaignLandingPage[] @relation("LandingOg")
+
+  @@index([category])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Menu & plans
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Meal {
+  id               String      @id @default(cuid())
+  name             String
+  slug             String      @unique
+  shortDescription String?
+  description      String?
+  imageId          String?
+  image            MediaAsset? @relation("MealPrimaryImage", fields: [imageId], references: [id], onDelete: SetNull)
+  // Nutrition: leave blank until verified. Never invent values.
+  calories         Int?
+  proteinG         Float?
+  carbsG           Float?
+  fatG             Float?
+  servingSize      String?
+  ingredients      String?
+  nutritionSource  String? // where the figures came from, e.g. "Brand Instagram post"
+  nutritionVerified Boolean    @default(false)
+  dietaryTags      String[]    @default([])
+  allergens        String[]    @default([]) // EU 14 allergens, only when provided by the business
+  label            String? // optional badge e.g. "Popular"
+  isFeatured       Boolean     @default(false)
+  isPublished      Boolean     @default(true)
+  archivedAt       DateTime?   @db.Timestamptz(3)
+  sortOrder        Int         @default(0)
+  isDemo           Boolean     @default(false)
+  seoTitle         String?
+  seoDescription   String?
+  createdAt        DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(3)
+
+  images MealImage[]
+
+  @@index([isPublished, archivedAt, sortOrder])
+  @@index([isFeatured])
+}
+
+model MealImage {
+  id           String     @id @default(cuid())
+  mealId       String
+  meal         Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  sortOrder    Int        @default(0)
+
+  @@unique([mealId, mediaAssetId])
+  @@index([mealId, sortOrder])
+}
+
+model Plan {
+  id               String    @id @default(cuid())
+  name             String // "1 Week"
+  slug             String    @unique
+  tagline          String? // "Starter", "Popular", "Commitment"
+  description      String?
+  durationDays     Int
+  mealsIncluded    Int?
+  features         String[]  @default([])
+  // null = price on request (shown as "Price confirmed on request")
+  priceCents       Int?
+  savingsLabel     String?
+  isRecommended    Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  archivedAt       DateTime? @db.Timestamptz(3)
+  sortOrder        Int       @default(0)
+  isDemo           Boolean   @default(false)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+
+  orders         Order[]
+  promotionPlans PromotionEligiblePlan[]
+
+  @@index([isActive, archivedAt, sortOrder])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fulfilment: delivery areas & collection points
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Region {
+  MALTA
+  GOZO
+  COMINO
+}
+
+model DeliveryArea {
+  id                String   @id @default(cuid())
+  name              String // locality, e.g. "Sliema"
+  slug              String   @unique
+  region            Region   @default(MALTA)
+  // Must be explicitly confirmed by the business before customers can select it.
+  deliveryAvailable Boolean  @default(false)
+  isPublished       Boolean  @default(false)
+  deliveryFeeCents  Int?
+  minOrderCents     Int?
+  deliveryDays      Int[]    @default([]) // 0 = Sunday … 6 = Saturday
+  deliveryWindow    String? // e.g. "Evening, 18:00–21:00"
+  notes             String?
+  zone              String?
+  // Individual indexable locality page — only when it has genuinely unique info.
+  hasPublicPage     Boolean  @default(false)
+  pageIntro         String?
+  pageBody          String?
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  orders Order[]
+
+  @@index([isPublished, deliveryAvailable, sortOrder])
+}
+
+model CollectionPoint {
+  id                  String   @id @default(cuid())
+  name                String
+  address             String?
+  showAddressPublicly Boolean  @default(false)
+  instructions        String?
+  availableDays       Int[]    @default([])
+  timeWindows         String? // free text, e.g. "Sunday 17:00–19:00"
+  isActive            Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+
+  orders Order[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customers & identity matching (no customer accounts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CustomerManualStatus {
+  FIRST_TIME // admin confirmed the person is a new customer
+  EXISTING // admin marked the person as an existing customer
+}
+
+model Customer {
+  id            String                @id @default(cuid())
+  name          String
+  email         String? // latest normalised email
+  phone         String? // latest E.164 phone
+  manualStatus  CustomerManualStatus?
+  notes         String?
+  firstOrderAt  DateTime?             @db.Timestamptz(3)
+  lastOrderAt   DateTime?             @db.Timestamptz(3)
+  anonymizedAt  DateTime?             @db.Timestamptz(3)
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+
+  identities           CustomerIdentity[]
+  orders               Order[]
+  redemptions          PromotionRedemption[]
+  marketingConsents    MarketingConsent[]
+  selectedPromotions   PromotionSelectedCustomer[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+enum IdentityType {
+  EMAIL
+  PHONE
+}
+
+model CustomerIdentity {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type       IdentityType
+  value      String // normalised (lower-cased email / E.164 phone)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([type, value])
+  @@index([customerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Promotions & campaigns
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DiscountType {
+  PERCENTAGE // discountValue in basis points (2000 = 20%)
+  FIXED_AMOUNT // discountValue in cents
+}
+
+enum PromotionAudience {
+  ALL_CUSTOMERS
+  NEW_CUSTOMERS
+  SELECTED_CUSTOMERS // requires a coupon code
+}
+
+enum SeasonalTheme {
+  NONE
+  HALLOWEEN
+  BLACK_FRIDAY
+  CHRISTMAS
+  NEW_YEAR
+  VALENTINES
+  SUMMER_FITNESS
+  NEW_CUSTOMER_WELCOME
+  CUSTOM
+}
+
+enum ExpiredBehavior {
+  HIDE
+  SHOW_ENDED_MESSAGE
+}
+
+model Promotion {
+  id                   String            @id @default(cuid())
+  name                 String
+  slug                 String            @unique
+  theme                SeasonalTheme     @default(NONE)
+  headline             String
+  subheadline          String?
+  description          String?
+  badgeText            String?
+  ctaText              String            @default("Claim your offer")
+  imageId              String?
+  image                MediaAsset?       @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  discountType         DiscountType
+  discountValue        Int
+  maxDiscountCents     Int?
+  audience             PromotionAudience @default(ALL_CUSTOMERS)
+  requiresCode         Boolean           @default(false)
+  code                 String?           @unique // stored upper-case
+  appliesToAllPlans    Boolean           @default(true)
+  startsAt             DateTime          @db.Timestamptz(3)
+  endsAt               DateTime          @db.Timestamptz(3)
+  isEnabled            Boolean           @default(false)
+  showCountdown        Boolean           @default(true)
+  showOnHomepage       Boolean           @default(true)
+  priority             Int               @default(0)
+  totalRedemptionLimit Int?
+  perCustomerLimit     Int?              @default(1)
+  terms                String?
+  expiredBehavior      ExpiredBehavior   @default(HIDE)
+  expiredMessage       String?
+  isDemo               Boolean           @default(false)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+
+  eligiblePlans      PromotionEligiblePlan[]
+  redemptions        PromotionRedemption[]
+  eligibilityReviews PromotionEligibilityReview[]
+  selectedCustomers  PromotionSelectedCustomer[]
+  orders             Order[]
+  landingPages       SeasonalCampaignLandingPage[]
+
+  @@index([isEnabled, startsAt, endsAt])
+}
+
+model PromotionEligiblePlan {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, planId])
+}
+
+model PromotionSelectedCustomer {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, customerId])
+}
+
+enum RedemptionStatus {
+  REQUESTED // order submitted with promotion, awaiting confirmation
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model PromotionRedemption {
+  id            String           @id @default(cuid())
+  promotionId   String
+  promotion     Promotion        @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  orderId       String           @unique
+  order         Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customer      Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status        RedemptionStatus @default(REQUESTED)
+  discountCents Int
+  createdAt     DateTime         @default(now()) @db.Timestamptz(3)
+  decidedAt     DateTime?        @db.Timestamptz(3)
+
+  @@index([promotionId, status])
+  @@index([customerId])
+}
+
+enum EligibilityStatus {
+  NOT_REQUIRED // promotion not restricted to new customers / no promotion
+  PRELIMINARY_ELIGIBLE // no matching history found (still subject to verification)
+  NEEDS_REVIEW // partial or conflicting match
+  LIKELY_INELIGIBLE // strong match with an existing customer / prior redemption
+  APPROVED // manual override: discount granted
+  REJECTED // manual override: discount refused
+}
+
+model PromotionEligibilityReview {
+  id              String            @id @default(cuid())
+  orderId         String
+  order           Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  promotionId     String
+  promotion       Promotion         @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  automatedResult EligibilityStatus
+  reasons         String[]          @default([])
+  decision        EligibilityStatus?
+  decidedById     String?
+  decidedBy       AdminUser?        @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt       DateTime?         @db.Timestamptz(3)
+  note            String?
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId])
+  @@index([promotionId])
+}
+
+enum LandingPageType {
+  SEASONAL
+  NEW_CUSTOMER
+  PLAN
+  REFERRAL
+  LOCAL_AD
+  CUSTOM
+}
+
+enum LandingExpiredBehavior {
+  HIDE // 404
+  SHOW_EXPIRED_MESSAGE
+  KEEP_INFO_PAGE
+  REDIRECT_TO_OFFERS
+}
+
+model SeasonalCampaignLandingPage {
+  id              String                 @id @default(cuid())
+  slug            String                 @unique // served at /offers/[slug]
+  type            LandingPageType        @default(SEASONAL)
+  title           String
+  headline        String
+  subheadline     String?
+  body            String? // sanitised HTML
+  ctaText         String                 @default("Claim your first-order offer")
+  heroImageId     String?
+  heroImage       MediaAsset?            @relation("LandingHero", fields: [heroImageId], references: [id], onDelete: SetNull)
+  promotionId     String?
+  promotion       Promotion?             @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  planIds         String[]               @default([])
+  utmCampaign     String?
+  isPublished     Boolean                @default(false)
+  noindex         Boolean                @default(true)
+  expiredBehavior LandingExpiredBehavior @default(SHOW_EXPIRED_MESSAGE)
+  expiredMessage  String?
+  seoTitle        String?
+  seoDescription  String?
+  ogImageId       String?
+  ogImage         MediaAsset?            @relation("LandingOg", fields: [ogImageId], references: [id], onDelete: SetNull)
+  createdAt       DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Orders
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  NEW
+  CONTACTED
+  CONFIRMED
+  IN_PREPARATION
+  COMPLETED
+  CANCELLED
+}
+
+// Kept separate from OrderStatus so online payments (e.g. Stripe) can be added later.
+enum PaymentStatus {
+  NOT_COLLECTED
+  PENDING
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+}
+
+enum FulfillmentMethod {
+  COLLECTION
+  DELIVERY
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    Int         @unique @default(autoincrement())
+  reference      String      @unique // e.g. MCP-000123
+  idempotencyKey String      @unique
+  status         OrderStatus @default(NEW)
+
+  // Payment boundary (no payment collected at launch)
+  paymentStatus    PaymentStatus @default(NOT_COLLECTED)
+  paymentProvider  String?
+  paymentReference String?
+  paidAmountCents  Int?
+  paidAt           DateTime?     @db.Timestamptz(3)
+
+  // Customer snapshot
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String
+  customerEmail  String
+  customerPhone  String
+  whatsappNumber String?
+
+  // Fulfilment snapshot
+  fulfillmentMethod   FulfillmentMethod
+  deliveryAreaId      String?
+  deliveryArea        DeliveryArea?     @relation(fields: [deliveryAreaId], references: [id], onDelete: SetNull)
+  deliveryLocality    String?
+  addressLine1        String?
+  addressLine2        String?
+  postalCode          String?
+  collectionPointId   String?
+  collectionPoint     CollectionPoint?  @relation(fields: [collectionPointId], references: [id], onDelete: SetNull)
+  collectionPointName String?
+  preferredStartDate  DateTime?         @db.Date
+
+  // Preferences (private)
+  mealPreference      String?
+  dietaryPreferences  String?
+  allergies           String?
+  specialInstructions String?
+  notes               String?
+
+  // Pricing snapshot — never recalculated after submission
+  planId            String?
+  plan              Plan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName          String
+  planDurationDays  Int
+  planMealsIncluded Int?
+  currency          String        @default("EUR")
+  basePriceCents    Int? // null = price on request
+  deliveryFeeCents  Int           @default(0)
+  discountCents     Int           @default(0)
+  totalCents        Int? // quoted (requested) total
+  confirmedTotalCents Int? // set by the team when the final price is agreed
+
+  // Promotion snapshot
+  promotionId        String?
+  promotion          Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionName      String?
+  promotionCode      String?
+  promotionDiscountType  DiscountType?
+  promotionDiscountValue Int?
+  promotionEndsAt    DateTime?         @db.Timestamptz(3)
+  promotionAudience  PromotionAudience?
+  eligibilityStatus  EligibilityStatus @default(NOT_REQUIRED)
+  eligibilityReasons String[]          @default([])
+  isReturningCustomer Boolean          @default(false)
+  isPotentialDuplicate Boolean         @default(false)
+
+  // Consent evidence
+  privacyAcknowledgedAt DateTime  @db.Timestamptz(3)
+  allergyConsentAt      DateTime? @db.Timestamptz(3)
+  firstOrderDeclared    Boolean   @default(false)
+  marketingOptIn        Boolean   @default(false)
+
+  // Attribution (no personal data)
+  landingPath  String?
+  referrerHost String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  utmTerm      String?
+  utmContent   String?
+
+  // Customer-facing confirmation page access (hashed random token)
+  confirmationTokenHash String?   @unique
+  confirmationExpiresAt DateTime? @db.Timestamptz(3)
+
+  contactedAt DateTime? @db.Timestamptz(3)
+  confirmedAt DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  statusHistory      OrderStatusHistory[]
+  internalNotes      OrderNote[]
+  redemption         PromotionRedemption?
+  eligibilityReviews PromotionEligibilityReview[]
+  emails             EmailOutbox[]
+  attribution        TrackingAttribution?
+  marketingConsents  MarketingConsent[]
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([customerId])
+  @@index([promotionId])
+  @@index([planId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  changedById String?
+  changedBy   AdminUser?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  note        String?
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId, createdAt])
+}
+
+model OrderNote {
+  id        String     @id @default(cuid())
+  orderId   String
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    AdminUser? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Email outbox (reliable delivery with retries)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED // will be retried at nextAttemptAt
+  DEAD // gave up after maxAttempts
+}
+
+enum EmailType {
+  ORDER_BUSINESS_NOTIFICATION
+  ORDER_CUSTOMER_CONFIRMATION
+  TEST
+}
+
+model EmailOutbox {
+  id                String      @id @default(cuid())
+  type              EmailType
+  dedupeKey         String      @unique
+  toAddress         String
+  replyTo           String?
+  subject           String
+  html              String
+  text              String
+  orderId           String?
+  order             Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  status            EmailStatus @default(PENDING)
+  attempts          Int         @default(0)
+  maxAttempts       Int         @default(8)
+  nextAttemptAt     DateTime    @default(now()) @db.Timestamptz(3)
+  lockedAt          DateTime?   @db.Timestamptz(3)
+  lastError         String?
+  provider          String?
+  providerMessageId String?
+  sentAt            DateTime?   @db.Timestamptz(3)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Marketing consent & attribution
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+}
+
+model MarketingConsent {
+  id                   String        @id @default(cuid())
+  customerId           String?
+  customer             Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId              String?
+  order                Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  email                String
+  channel              String        @default("EMAIL")
+  status               ConsentStatus @default(GRANTED)
+  source               String // e.g. "order_form"
+  consentText          String // exact wording shown to the customer
+  unsubscribeTokenHash String?       @unique
+  grantedAt            DateTime      @default(now()) @db.Timestamptz(3)
+  withdrawnAt          DateTime?     @db.Timestamptz(3)
+
+  @@index([email])
+  @@index([customerId])
+}
+
+model TrackingAttribution {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  landingPath  String?
+  referrerHost String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  utmTerm      String?
+  utmContent   String?
+  promotionSlug String?
+  firstSeenAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([utmSource])
+  @@index([utmCampaign])
+}
+
+// First-party, cookieless event log. Never contains names, emails, phones,
+// addresses or allergy information.
+model AnalyticsEvent {
+  id           String   @id @default(cuid())
+  name         String // page_view, view_meal, select_plan, click_whatsapp …
+  path         String?
+  referrerHost String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  planSlug     String?
+  mealSlug     String?
+  promotionSlug String?
+  device       String? // "mobile" | "desktop" | "tablet"
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+  @@index([path])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Content: gallery, FAQ, testimonials, blog, page content, settings
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GalleryItem {
+  id           String     @id @default(cuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  caption      String?
+  altText      String?
+  instagramUrl String? // validated: must be an instagram.com URL
+  isPublished  Boolean    @default(true)
+  isFeatured   Boolean    @default(true) // shown on the homepage
+  sortOrder    Int        @default(0)
+  isDemo       Boolean    @default(false)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, sortOrder])
+}
+
+model FAQ {
+  id             String   @id @default(cuid())
+  question       String
+  answer         String
+  category       String?
+  isPublished    Boolean  @default(true)
+  showOnHomepage Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, sortOrder])
+}
+
+model Testimonial {
+  id                String      @id @default(cuid())
+  quote             String
+  displayName       String // name or initials, as approved by the customer
+  context           String? // e.g. "2-week plan customer"
+  photoId           String?
+  photo             MediaAsset? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  consentRecordedAt DateTime?   @db.Timestamptz(3)
+  consentNotes      String? // how/when permission was given
+  source            String? // e.g. "Instagram DM", "Email"
+  isPublished       Boolean     @default(false)
+  sortOrder         Int         @default(0)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(3)
+}
+
+model BlogCategory {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  sortOrder   Int        @default(0)
+  posts       BlogPost[]
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED // visible once publishAt <= now (future = scheduled)
+}
+
+model BlogPost {
+  id               String         @id @default(cuid())
+  title            String
+  slug             String         @unique
+  excerpt          String?
+  contentHtml      String         @default("") // sanitised on save and on render
+  coverImageId     String?
+  coverImage       MediaAsset?    @relation("BlogCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  coverAlt         String?
+  categoryId       String?
+  category         BlogCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  authorName       String?
+  authorBio        String?
+  authorUrl        String?
+  status           BlogPostStatus @default(DRAFT)
+  publishAt        DateTime?      @db.Timestamptz(3)
+  isFeatured       Boolean        @default(false)
+  needsReview      Boolean        @default(true) // fact-check before publishing
+  seoTitle         String?
+  seoDescription   String?
+  primaryTopic     String?
+  ogTitle          String?
+  ogDescription    String?
+  ogImageId        String?
+  ogImage          MediaAsset?    @relation("BlogOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  canonicalUrl     String?
+  noindex          Boolean        @default(false)
+  previewToken     String?        @unique
+  contentUpdatedAt DateTime       @default(now()) @db.Timestamptz(3)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([status, publishAt])
+  @@index([categoryId])
+}
+
+// Structured, validated JSON content blocks (homepage hero, benefits, service
+// pages, legal pages …). Each key has a zod schema in src/lib/content.
+model PageContent {
+  key         String   @id
+  data        Json
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  updatedById String?
+}
+
+// Typed settings groups (business, branding, contact, fulfilment, tracking …).
+// Each key has a zod schema with safe defaults in src/lib/settings.
+model SiteSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  updatedById String?
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEO & local visibility
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SEOPageMetadata {
+  id              String      @id @default(cuid())
+  pageKey         String      @unique // see src/lib/seo/pages.ts
+  title           String?
+  description     String?
+  primaryTopic    String?
+  ogTitle         String?
+  ogDescription   String?
+  ogImageId       String?
+  ogImage         MediaAsset? @relation(fields: [ogImageId], references: [id], onDelete: SetNull)
+  noindex         Boolean     @default(false)
+  canonicalUrl    String?
+  breadcrumbLabel String?
+  createdAt       DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(3)
+}
+
+model RedirectRule {
+  id         String    @id @default(cuid())
+  fromPath   String    @unique
+  toPath     String
+  statusCode Int       @default(301)
+  isActive   Boolean   @default(true)
+  note       String?
+  hits       Int       @default(0)
+  lastHitAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+enum ListingStatus {
+  NOT_STARTED
+  SUBMITTED
+  PENDING_VERIFICATION
+  VERIFIED
+  NEEDS_UPDATE
+  REJECTED
+}
+
+model BusinessListing {
+  id            String        @id @default(cuid())
+  platform      String
+  url           String?
+  status        ListingStatus @default(NOT_STARTED)
+  submittedAt   DateTime?     @db.Timestamptz(3)
+  lastCheckedAt DateTime?     @db.Timestamptz(3)
+  detailsUsed   String?
+  notes         String?
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+}
+
+model SiteHealthCheck {
+  id         String   @id @default(cuid())
+  trigger    String   @default("manual") // manual | scheduled
+  issues     Json // array of { code, severity, message, href }
+  issueCount Int
+  durationMs Int
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+}
+
+// Owner checklists (launch readiness & monthly routine) — manual ticks.
+model ChecklistItemState {
+  key         String    @id // e.g. "launch.gbp_claimed", "monthly.2026-11.review_performance"
+  done        Boolean   @default(false)
+  doneAt      DateTime? @db.Timestamptz(3)
+  doneById    String?
+  note        String?
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+}
