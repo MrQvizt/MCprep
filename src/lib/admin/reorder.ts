@@ -6,16 +6,17 @@ interface SortDelegate {
   update(args: { where: { id: string }; data: { sortOrder: number } }): unknown;
 }
 
+// Resolved lazily so importing this module never touches the database.
 const DELEGATES = {
-  faq: db.fAQ,
-  meal: db.meal,
-  plan: db.plan,
-  galleryItem: db.galleryItem,
-  testimonial: db.testimonial,
-  deliveryArea: db.deliveryArea,
-  collectionPoint: db.collectionPoint,
-  businessListing: db.businessListing,
-  blogCategory: db.blogCategory,
+  faq: () => db.fAQ,
+  meal: () => db.meal,
+  plan: () => db.plan,
+  galleryItem: () => db.galleryItem,
+  testimonial: () => db.testimonial,
+  deliveryArea: () => db.deliveryArea,
+  collectionPoint: () => db.collectionPoint,
+  businessListing: () => db.businessListing,
+  blogCategory: () => db.blogCategory,
 } as const;
 
 export type SortableModel = keyof typeof DELEGATES;
@@ -25,7 +26,7 @@ export type SortableModel = keyof typeof DELEGATES;
  * Lists are small (tens of items), so renumbering everything is simplest.
  */
 export async function moveItem(model: SortableModel, id: string, direction: "up" | "down", where: object = {}) {
-  const delegate = DELEGATES[model] as unknown as SortDelegate;
+  const delegate = DELEGATES[model]() as unknown as SortDelegate;
   const rows = await delegate.findMany({
     where,
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -45,7 +46,7 @@ export async function moveItem(model: SortableModel, id: string, direction: "up"
 
 /** Next sortOrder value for appending a new item at the end. */
 export async function nextSortOrder(model: SortableModel): Promise<number> {
-  const delegate = DELEGATES[model] as unknown as {
+  const delegate = DELEGATES[model]() as unknown as {
     aggregate(args: { _max: { sortOrder: true } }): Promise<{ _max: { sortOrder: number | null } }>;
   };
   const agg = await delegate.aggregate({ _max: { sortOrder: true } });
