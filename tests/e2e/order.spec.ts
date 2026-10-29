@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { adminLogin } from "./helpers";
 
 /**
  * Critical customer journey (runs on desktop and on a mobile viewport):
@@ -46,6 +47,15 @@ test.describe("order request journey", () => {
     await expect(page.getByText("No payment has been taken").first()).toBeVisible();
     // Private details are not shown on the confirmation page.
     await expect(page.getByText("Triq it-Torri")).toHaveCount(0);
+    const reference = /ref=(MCP-\d{6})/.exec(page.url())![1];
+
+    // The order is waiting in the admin, with the first-order check flagged for review.
+    await adminLogin(page, "/admin/orders");
+    const row = page.getByText(reference).filter({ visible: true }).first();
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page.locator("main")).toContainText("E2E Customer");
+    await expect(page.locator("main")).toContainText(/New customer \(preliminary\)|eligib/i);
   });
 
   test("shows clear validation errors and keeps what was typed", async ({ page }) => {

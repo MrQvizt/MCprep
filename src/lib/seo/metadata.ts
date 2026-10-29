@@ -105,3 +105,10 @@ export async function staticPageMetadata(key: StaticPageKey): Promise<Metadata> 
     canonical: seo.canonical,
   });
 }
+
+/** "Title | MC PREPS Malta" using the configurable title suffix (Business settings → SEO defaults). */
+export async function titleWithSuffix(title: string): Promise<string> {
+  const settings = await getSettings();
+  const suffix = settings.seo.titleSuffix.trim();
+  return suffix ? `${title} | ${suffix}` : title;
+}

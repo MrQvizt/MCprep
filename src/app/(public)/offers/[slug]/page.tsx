@@ -16,7 +16,7 @@ import { getLandingPage } from "@/lib/public/data";
 import { orderHref, resolveLandingPage } from "@/lib/public/landing";
 import { crumbFor } from "@/lib/public/page";
 import { getPublicPlans, requestNow } from "@/lib/public-data";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { buildMetadata, titleWithSuffix } from "@/lib/seo/metadata";
 import { getSettings } from "@/lib/settings";
 import { formatDateTime } from "@/lib/time";
 
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: PageProps<"/offers/[slug]">):
   const { page, resolution } = data;
   const og = page.ogImage ?? page.heroImage;
   return buildMetadata({
-    title: page.seoTitle || `${page.title} | MC PREPS Malta`,
+    title: page.seoTitle || (await titleWithSuffix(page.title)),
     description: page.seoDescription || page.subheadline || `${page.headline} — MC PREPS meal prep in Malta.`,
     path: `/offers/${page.slug}`,
     ogImage: og ? { url: og.url, width: og.width, height: og.height, alt: og.altText } : null,

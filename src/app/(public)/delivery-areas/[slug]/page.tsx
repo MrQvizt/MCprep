@@ -9,7 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { getLocality } from "@/lib/public/data";
 import { hasLocalityPage, REGION_LABELS } from "@/lib/public/delivery";
 import { crumbFor, getWhatsappHref } from "@/lib/public/page";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { buildMetadata, titleWithSuffix } from "@/lib/seo/metadata";
 import { getSettings } from "@/lib/settings";
 import { formatWeekdays } from "@/lib/time";
 
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/delivery-areas/[s
   const area = await load(slug);
   if (!area) return { title: "Area not found", robots: { index: false } };
   return buildMetadata({
-    title: `Meal Prep Delivery in ${area.name} | MC PREPS Malta`,
+    title: await titleWithSuffix(`Meal Prep Delivery in ${area.name}`),
     description: (area.pageIntro || `MC PREPS meal prep delivery and collection options for ${area.name}, Malta.`).slice(0, 160),
     path: `/delivery-areas/${area.slug}`,
   });

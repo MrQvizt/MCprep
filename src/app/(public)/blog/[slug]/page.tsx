@@ -16,7 +16,7 @@ import { getBlogPost, getJsonLdContext, getLatestPosts } from "@/lib/public/data
 import { crumbFor, getWhatsappHref } from "@/lib/public/page";
 import { requestNow } from "@/lib/public-data";
 import { blogPostingJsonLd } from "@/lib/seo/jsonld";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { buildMetadata, titleWithSuffix } from "@/lib/seo/metadata";
 import { formatDate } from "@/lib/time";
 
 type Props = PageProps<"/blog/[slug]">;
@@ -38,7 +38,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const { post, preview } = data;
   const image = post.ogImage ?? post.coverImage;
   return buildMetadata({
-    title: post.seoTitle || `${post.title} | MC PREPS Malta`,
+    title: post.seoTitle || (await titleWithSuffix(post.title)),
     description: post.seoDescription || post.excerpt || htmlToText(post.contentHtml).slice(0, 155),
     path: `/blog/${post.slug}`,
     ogTitle: post.ogTitle,

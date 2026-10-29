@@ -12,7 +12,7 @@ import { Section, TextBlock } from "@/components/public/section";
 import { MediaImage } from "@/components/shared/media-image";
 import { crumbFor, getWhatsappHref } from "@/lib/public/page";
 import { getMealBySlug, getPublishedMeals } from "@/lib/public-data";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { buildMetadata, titleWithSuffix } from "@/lib/seo/metadata";
 
 export async function generateMetadata({ params }: PageProps<"/menu/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/menu/[slug]">): P
     .join(", ");
   const image = meal.image ?? meal.images[0]?.mediaAsset ?? null;
   return buildMetadata({
-    title: meal.seoTitle || `${meal.name}${macros ? ` (${macros})` : ""} | MC PREPS Malta`,
+    title: meal.seoTitle || (await titleWithSuffix(`${meal.name}${macros ? ` (${macros})` : ""}`)),
     description:
       meal.seoDescription ||
       `${meal.name} from the MC PREPS menu${macros ? ` — ${macros}` : ""}. Macro-tracked meal prep in Malta with collection and delivery.`,

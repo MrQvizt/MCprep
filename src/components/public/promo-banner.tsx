@@ -52,7 +52,7 @@ export function PromoBanner({
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
       </div>
-      <div className="container-site grid gap-10 py-16 sm:py-20 lg:grid-cols-[1.2fr_1fr] lg:items-end lg:py-24">
+      <div className="container-site grid gap-10 py-16 sm:py-20 lg:py-24 xl:grid-cols-[1.2fr_1fr] xl:items-end">
         <div>
           {promo.badgeText && (
             <p className={cn("inline-block px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.2em]", accent)}>{text(promo.badgeText)}</p>
@@ -90,7 +90,7 @@ export function PromoBanner({
           )}
         </div>
         {!ended && promo.showCountdown && (
-          <div className="lg:justify-self-end">
+          <div className="xl:justify-self-end">
             <Countdown endsAt={promo.endsAt} serverNow={serverNow} refreshOnEnd={!preview} />
           </div>
         )}
