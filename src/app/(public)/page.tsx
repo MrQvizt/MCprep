@@ -60,17 +60,26 @@ function heroOffer(
   const weekly = plans.filter((x) => isPackage(x) && !x.isSubscription && x.mealsPerWeek && x.priceCents !== null);
   const pkg = weekly.find((x) => x.isRecommended) ?? weekly[0];
   let example: string | null = null;
+  let wasPerMeal: string | null = null;
+  let savePercent: number | null = null;
   if (perMeal !== null && pkg?.mealsPerWeek && pkg.priceCents !== null) {
     const offerPrice = pkg.mealsPerWeek * perMeal;
     if (offerPrice < pkg.priceCents) {
       example = `${pkg.mealsPerWeek} meals for ${money(offerPrice)} instead of ${money(pkg.priceCents)} — save ${money(pkg.priceCents - offerPrice)}`;
+      if (pkg.perMealCents !== null && pkg.perMealCents > perMeal) {
+        wasPerMeal = money(pkg.perMealCents);
+        savePercent = Math.round((1 - perMeal / pkg.perMealCents) * 100);
+      }
     }
   }
   return {
     slug: p.slug,
     title: perMeal !== null ? `First week ${money(perMeal)} a meal` : p.headline,
+    price: perMeal !== null ? money(perMeal) : null,
+    wasPerMeal,
+    savePercent,
     example,
-    ctaLabel: perMeal !== null ? `Claim ${money(perMeal)} meals` : "Claim the offer",
+    ctaLabel: perMeal !== null ? `Claim my ${money(perMeal)} meals` : "Claim the offer",
     windowMinutes: p.personalWindowMinutes,
     endsAt: p.endsAt,
     newCustomersOnly: p.audience === "NEW_CUSTOMERS",

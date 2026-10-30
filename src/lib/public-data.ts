@@ -68,6 +68,10 @@ export interface PublicPlan {
     endsAt: string;
     /** True when the deadline is the visitor's personal window (e.g. 2 hours). */
     personal: boolean;
+    /** Personal window length (minutes) and when this visitor's window started, for the live countdown. */
+    windowMinutes: number | null;
+    windowStartedAt: string | null;
+    serverNow: string;
   } | null;
 }
 
@@ -82,6 +86,7 @@ export function bestOfferForPlan(plan: PricingPlan, promotions: PricingPromotion
   // (labelled "first order" when it depends on verification).
   const quote = computeQuote({ plan, promotions, now, firstOrderDeclared: true, offerWindowStartedAt: offerWindowStartedAt ?? now });
   if (!quote.promotion || quote.discountCents <= 0) return null;
+  const windowMinutes = promotions.find((p) => p.id === quote.promotion!.id)?.personalWindowMinutes ?? null;
   return {
     promotionId: quote.promotion.id,
     promotionSlug: quote.promotion.slug,
@@ -90,7 +95,10 @@ export function bestOfferForPlan(plan: PricingPlan, promotions: PricingPromotion
     priceCents: plan.priceCents - quote.discountCents,
     firstOrderOnly: quote.promotion.audience === "NEW_CUSTOMERS",
     endsAt: quote.promotion.endsAt.toISOString(),
-    personal: Boolean(promotions.find((p) => p.id === quote.promotion!.id)?.personalWindowMinutes),
+    personal: Boolean(windowMinutes),
+    windowMinutes,
+    windowStartedAt: windowMinutes && offerWindowStartedAt ? offerWindowStartedAt.toISOString() : null,
+    serverNow: now.toISOString(),
   };
 }
 

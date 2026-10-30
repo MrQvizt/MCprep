@@ -112,10 +112,12 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     await page.goto("/");
     const offer = page.getByRole("region", { name: "New customer offer" });
     await expect(offer).toBeVisible();
-    await expect(offer).toContainText("First week €6 a meal");
+    await expect(offer).toContainText("Limited-time deal");
+    await expect(offer).toContainText(/First week\s*€6\s*a meal/i);
+    await expect(offer).toContainText("€9.50"); // the normal price per meal, struck through
     await expect(offer).toContainText("10 meals for €60 instead of €95 — save €35");
     await expect(offer.getByRole("timer")).toBeVisible();
-    await expect(offer.getByRole("link", { name: /Claim €6 meals/ })).toHaveAttribute("href", "/order");
+    await expect(offer.getByRole("link", { name: /Claim my €6 meals/ })).toHaveAttribute("href", "/order");
     // Shown once: the small offer strip at the top of other pages is hidden here.
     await expect(page.locator('[data-promotion="first-week-6-euro"]')).toHaveCount(1);
     // Packages come straight after the hero, before the menu.
@@ -125,6 +127,17 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
       return plans && menu ? plans.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING : 0;
     });
     expect(order).toBeTruthy();
+  });
+
+  test("package cards show the first-week price with the visitor's live countdown", async ({ page }) => {
+    await page.goto("/plans");
+    const card = page.locator('article[aria-label="Lunch + Dinner · 5 days"]').first();
+    await expect(card).toContainText(/First week\s*€60/i);
+    const timer = card.getByRole("timer");
+    await expect(timer).toContainText(/Ends in \d:\d\d:\d\d/);
+    const first = await timer.textContent();
+    await page.waitForTimeout(1500);
+    expect(await timer.textContent()).not.toBe(first); // ticking
   });
 
   test("the ordering deadline names the week it is for", async ({ page }) => {
