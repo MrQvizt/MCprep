@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Flame } from "lucide-react";
-import { startOfferWindowAction } from "@/app/(public)/offer-actions";
-import { useServerClockSeconds } from "@/hooks/use-server-clock";
+import { pad2 as pad, useOfferCountdown } from "./use-offer-countdown";
 
 export interface OfferBarPromo {
   slug: string;
@@ -16,41 +14,25 @@ export interface OfferBarPromo {
   newCustomersOnly: boolean;
 }
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
 /**
  * Site-wide bar for an offer with a personal deadline ("order within 2
  * hours"). The window starts the first time the visitor sees it and is kept
  * by the server, so the countdown is the same on every page and reload. It
  * disappears when the visitor's window has ended.
  */
-export function OfferBar({ promo, startedAt: initialStart, serverNow: initialNow }: { promo: OfferBarPromo; startedAt: string | null; serverNow: string }) {
+export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo; startedAt: string | null; serverNow: string }) {
   const pathname = usePathname();
-  const [startedAt, setStartedAt] = useState(initialStart);
-  const [serverNow, setServerNow] = useState(initialNow);
+  // The homepage and the order page show their own, bigger offer card.
+  const ownCard = pathname === "/" || pathname.startsWith("/order");
+  const { remaining } = useOfferCountdown({
+    windowMinutes: promo.windowMinutes,
+    endsAt: promo.endsAt,
+    startedAt,
+    serverNow,
+    autoStart: !ownCard,
+  });
 
-  useEffect(() => {
-    if (startedAt) return;
-    let cancelled = false;
-    void startOfferWindowAction().then((r) => {
-      if (cancelled || !r) return;
-      setServerNow(r.serverNow);
-      setStartedAt(r.startedAt);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [startedAt]);
-
-  const deadline = useMemo(() => {
-    const start = startedAt ? new Date(startedAt).getTime() : new Date(serverNow).getTime();
-    return Math.min(start + promo.windowMinutes * 60_000, new Date(promo.endsAt).getTime());
-  }, [startedAt, serverNow, promo.windowMinutes, promo.endsAt]);
-  const nowSec = useServerClockSeconds(serverNow);
-  const remaining = Math.max(0, Math.floor(deadline / 1000) - nowSec);
-
-  // The order page shows its own offer card.
-  if (remaining <= 0 || pathname.startsWith("/order")) return null;
+  if (remaining <= 0 || ownCard) return null;
 
   const h = Math.floor(remaining / 3600);
   const m = Math.floor((remaining % 3600) / 60);
