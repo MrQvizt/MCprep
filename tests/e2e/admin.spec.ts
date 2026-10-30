@@ -14,6 +14,12 @@ test.describe("admin portal", () => {
 
     await page.goto("/plans");
     await expect(page.locator('article[aria-label="Lunch · 5 days"]').first()).toContainText("€55 a week");
+
+    // Put the real price back so later tests see the owner's prices.
+    await page.goBack();
+    await page.locator('input[name="price"]').fill("52.50");
+    await page.getByRole("button", { name: "Save plan" }).click();
+    await expect(page.getByText(/saved|updated/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("owner can edit a page's Google title", async ({ page, request }) => {

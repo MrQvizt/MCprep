@@ -52,7 +52,7 @@ export function FulfillmentForm({ values }: { values: SettingsOf<"fulfillment"> 
         <CheckboxField
           name="weeklyCutoffEnabled"
           label="Weekly ordering deadline"
-          hint="Shown across the website and in the order form, e.g. “For delivery next week, order before Wednesday 4pm”. Start dates before the next deliverable week can't be chosen."
+          hint="Shown across the website and in the order form, e.g. “Order by Wed 4 Nov, 4pm for delivery from Mon 9 Nov”. Start dates before the next deliverable week can't be chosen."
           defaultChecked={values.weeklyCutoffEnabled}
         />
         <div className="mt-4 flex flex-wrap gap-4">

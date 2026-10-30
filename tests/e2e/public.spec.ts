@@ -127,6 +127,13 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     expect(order).toBeTruthy();
   });
 
+  test("the ordering deadline names the week it is for", async ({ page }) => {
+    await page.goto("/menu");
+    const note = page.getByRole("note", { name: "Ordering deadline" });
+    await expect(note).toContainText(/Order by \w{3} \d{1,2} \w{3}, 4pm for delivery from Mon \d{1,2} \w{3}/);
+    await expect(note).not.toContainText("next week");
+  });
+
   test("the first-week offer's personal 2-hour window doesn't restart on reload", async ({ page }) => {
     await page.goto("/menu");
     const bar = page.locator('[data-promotion="first-week-6-euro"]').first();
