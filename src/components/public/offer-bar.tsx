@@ -40,7 +40,7 @@ export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo
   const clock = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 
   return (
-    <div className="border-b border-white/10 bg-white text-ink" data-promotion={promo.slug} role="region" aria-label="Offer">
+    <div className="border-b border-red-700 bg-red-600 text-white" data-promotion={promo.slug} role="region" aria-label="Offer">
       <Link
         href="/order"
         data-track="select_promotion"
@@ -49,12 +49,12 @@ export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo
       >
         <Flame className="size-4 shrink-0" aria-hidden="true" />
         <span>
-          {promo.newCustomersOnly && <span className="hidden text-red-600 sm:inline">New here? </span>}
+          {promo.newCustomersOnly && <span className="hidden sm:inline">New here? </span>}
           {promo.shortLabel}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="hidden sm:inline font-normal normal-case tracking-normal">ends in</span>
-          <span role="timer" aria-label={`${h} hours ${m} minutes left`} className="bg-ink px-2 py-0.5 font-display tabular tracking-normal text-white">
+          <span role="timer" aria-label={`${h} hours ${m} minutes left`} className="bg-white px-2 py-0.5 font-display tabular tracking-normal text-red-700">
             {clock}
           </span>
         </span>

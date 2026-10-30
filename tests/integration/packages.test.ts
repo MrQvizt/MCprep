@@ -54,7 +54,7 @@ describe("studio dish photos release", () => {
     await db.meal.create({ data: { slug: "pepper-pesto-pasta", name: "Pepper Pesto Pasta", imageId: custom.id } }); // owner's own photo
     await db.galleryItem.create({ data: { mediaAssetId: oldPasta.id, caption: "Pepper Pesto Pasta", altText: "old", sortOrder: 0 } });
 
-    expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-studio-dish-photos"]);
+    expect(await applyReleases(db, () => {})).toContain("2026-10-30-studio-dish-photos");
 
     const poke = await db.meal.findUniqueOrThrow({ where: { slug: "chicken-pokebowl" }, include: { image: true } });
     expect(poke.image).toMatchObject({ url: "/images/dishes/chicken-poke-bowl.webp", width: 1200, height: 1200 });
@@ -63,6 +63,17 @@ describe("studio dish photos release", () => {
     const tile = await db.galleryItem.findFirstOrThrow({ include: { mediaAsset: true } });
     expect(tile.mediaAsset?.url).toBe("/images/dishes/pepper-pesto-pasta.webp");
     expect(tile.altText).toMatch(/penne and chicken/);
+  });
+});
+
+describe("preview notice release", () => {
+  it("turns the preview notice off and keeps the other site settings", async () => {
+    const done = RELEASES.map((r) => r.id).filter((id) => id !== "2026-10-30-hide-preview-notice");
+    await db.siteSetting.create({ data: { key: "_releases", value: { applied: done } } });
+    await db.siteSetting.create({ data: { key: "site", value: { showDemoNotice: true, announcementText: "Hello Malta" } } });
+    expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-hide-preview-notice"]);
+    const site = await db.siteSetting.findUniqueOrThrow({ where: { key: "site" } });
+    expect(site.value).toMatchObject({ showDemoNotice: false, announcementText: "Hello Malta" });
   });
 });
 
