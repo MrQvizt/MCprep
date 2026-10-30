@@ -11,6 +11,13 @@ import { staticPageMetadata } from "@/lib/seo/metadata";
 import { getSettings } from "@/lib/settings";
 import { isInstagramUrl } from "@/lib/urls";
 
+/** Width/height of the About photo frame: the photo's own shape, kept between 3:4 (tall) and 4:3 (wide). */
+function photoRatio(image: { width: number | null; height: number | null } | null): string {
+  if (!image?.width || !image.height) return "4 / 5";
+  const r = Math.min(4 / 3, Math.max(3 / 4, image.width / image.height));
+  return String(Math.round(r * 1000) / 1000);
+}
+
 export async function generateMetadata() {
   return staticPageMetadata("about");
 }
@@ -30,7 +37,17 @@ export default async function AboutPage() {
       <Section tone="paper" aria-label="Our story">
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">
-            <MediaImage media={image} alt={image?.altText ?? "MC PREPS"} sizes="(min-width:1024px) 40vw, 100vw" className="aspect-[4/5] w-full" placeholderLabel="MC PREPS kitchen — photo coming soon" />
+            {/* The frame takes the photo's own shape (within reason), so nothing important is cropped. */}
+            <div style={{ aspectRatio: photoRatio(image) }} className="w-full">
+              <MediaImage
+                media={image}
+                alt={image?.altText ?? "MC PREPS"}
+                sizes="(min-width:1024px) 40vw, 100vw"
+                className="size-full"
+                imgClassName="object-top"
+                placeholderLabel="MC PREPS kitchen — photo coming soon"
+              />
+            </div>
           </div>
           <div className="lg:col-span-7 lg:pt-6">
             <TextBlock text={content.body} className="text-lg leading-relaxed text-ink/80 sm:text-xl [&>p:first-child]:text-ink" />

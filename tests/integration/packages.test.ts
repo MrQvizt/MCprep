@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { orderRequestSchema, type OrderRequestInput } from "@/lib/orders/schema";
 import { createOrderRequest, OrderValidationError, quoteForOrder } from "@/lib/orders/service";
-import { applyReleases, RELEASES } from "../../prisma/releases";
+import { ABOUT_PHOTO, applyReleases, RELEASES } from "../../prisma/releases";
 
 const NOW = new Date();
 const MIN = 60_000;
@@ -74,6 +74,20 @@ describe("preview notice release", () => {
     expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-hide-preview-notice"]);
     const site = await db.siteSetting.findUniqueOrThrow({ where: { key: "site" } });
     expect(site.value).toMatchObject({ showDemoNotice: false, announcementText: "Hello Malta" });
+  });
+});
+
+describe("about photo release", () => {
+  it("puts the stage photo on the About page and keeps the page's text", async () => {
+    const done = RELEASES.map((r) => r.id).filter((id) => id !== "2026-10-30-about-photo");
+    await db.siteSetting.create({ data: { key: "_releases", value: { applied: done } } });
+    await db.pageContent.create({ data: { key: "page.about", data: { heading: "Our story", imageId: null } } });
+    expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-about-photo"]);
+    const about = await db.pageContent.findUniqueOrThrow({ where: { key: "page.about" } });
+    const photo = await db.mediaAsset.findUniqueOrThrow({ where: { storageKey: `static${ABOUT_PHOTO.url}` } });
+    expect(about.data).toEqual({ heading: "Our story", imageId: photo.id });
+    expect(photo).toMatchObject({ url: ABOUT_PHOTO.url, width: 1238, height: 1271, mimeType: "image/webp" });
+    expect(photo.sizeBytes).toBeGreaterThan(0); // the file ships with the site
   });
 });
 

@@ -30,7 +30,14 @@ function fileSize(publicUrl: string): number {
 }
 
 /** Media asset for a photo shipped with the site (served from /public). */
-async function staticImage(db: Db, url: string, altText: string, category: "MEAL" | "GALLERY" | "BRANDING", width: number, height: number) {
+async function staticImage(
+  db: Db,
+  url: string,
+  altText: string,
+  category: "MEAL" | "GALLERY" | "BRANDING" | "GENERAL",
+  width: number,
+  height: number,
+) {
   const storageKey = `static${url}`; // e.g. static/images/dishes/x.webp — never deleted from storage
   return db.mediaAsset.upsert({
     where: { storageKey },
@@ -48,6 +55,14 @@ async function staticImage(db: Db, url: string, altText: string, category: "MEAL
     },
   });
 }
+
+/** Owner's stage photo for the About page (public/images/about). */
+export const ABOUT_PHOTO = {
+  url: "/images/about/ifbb-semipro-stage.webp",
+  alt: "On stage at an IFBB Semipro bodybuilding competition",
+  width: 1238,
+  height: 1271,
+};
 
 export const RELEASES: Release[] = [
   {
@@ -186,6 +201,19 @@ export const RELEASES: Release[] = [
       const value = { ...current, showDemoNotice: false };
       await db.siteSetting.upsert({ where: { key: "site" }, create: { key: "site", value }, update: { value } });
       log("Preview notice turned off");
+    },
+  },
+  {
+    id: "2026-10-30-about-photo",
+    description: "Stage photo (IFBB Semipro) on the About page (owner request)",
+    async run(db, log) {
+      const photo = await staticImage(db, ABOUT_PHOTO.url, ABOUT_PHOTO.alt, "GENERAL", ABOUT_PHOTO.width, ABOUT_PHOTO.height);
+      const row = await db.pageContent.findUnique({ where: { key: "page.about" } });
+      const current = row?.data && typeof row.data === "object" && !Array.isArray(row.data) ? (row.data as Record<string, unknown>) : {};
+      // Only the photo changes; the page's text (edited or default) stays as it is.
+      const data = { ...current, imageId: photo.id };
+      await db.pageContent.upsert({ where: { key: "page.about" }, create: { key: "page.about", data }, update: { data } });
+      log("About page photo set");
     },
   },
 ];
