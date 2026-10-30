@@ -55,8 +55,10 @@ export function HeroOffer({ offer, className }: { offer: HeroOfferData; classNam
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1fr_auto_auto] lg:items-center lg:gap-8">
         <div>
           <p className="flex items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-ink/70">
-            <Flame className="size-4 text-ink" aria-hidden="true" />
-            {offer.newCustomersOnly ? "New customers · limited time" : "Limited time"}
+            <Flame className="size-4 text-red-600" aria-hidden="true" />
+            {offer.newCustomersOnly && <span className="text-red-600">New here?</span>}
+            {offer.newCustomersOnly ? <span aria-hidden="true">·</span> : null}
+            <span>Limited time</span>
           </p>
           <p className="mt-2 font-display text-3xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl">{offer.title}</p>
           {offer.example && <p className="mt-2 text-sm font-medium text-ink/75 sm:text-base">{offer.example}</p>}

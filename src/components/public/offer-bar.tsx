@@ -49,7 +49,7 @@ export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo
       >
         <Flame className="size-4 shrink-0" aria-hidden="true" />
         <span>
-          <span className="hidden sm:inline">{promo.newCustomersOnly ? "New here? " : ""}</span>
+          {promo.newCustomersOnly && <span className="hidden text-red-600 sm:inline">New here? </span>}
           {promo.shortLabel}
         </span>
         <span className="inline-flex items-center gap-1.5">
