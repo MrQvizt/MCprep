@@ -21,9 +21,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
         <div className="light mt-8 rounded-xl bg-paper p-6 text-ink shadow-2xl">
           <LoginForm next={next} />
         </div>
-        <p className="mt-6 text-xs text-fog">
-          Admin accounts are created with <code className="text-white">npm run admin:create</code>. See the README.
-        </p>
       </div>
     </div>
   );
