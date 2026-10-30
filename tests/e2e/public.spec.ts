@@ -160,6 +160,15 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     await expect(note).not.toContainText("next week");
   });
 
+  test("the About page shows the stage photo uncropped", async ({ page }) => {
+    await page.goto("/about");
+    const photo = page.getByRole("img", { name: /IFBB Semipro/ });
+    await expect(photo).toBeVisible();
+    await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    const box = (await photo.boundingBox())!;
+    expect(box.width / box.height).toBeCloseTo(1238 / 1271, 1); // frame follows the photo's shape
+  });
+
   test("the first-week offer's personal 2-hour window doesn't restart on reload", async ({ page }) => {
     await page.goto("/menu");
     const bar = page.locator('[data-promotion="first-week-6-euro"]').first();
