@@ -1,9 +1,10 @@
-import { Check, Flame } from "lucide-react";
+import { Check } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { MEALS_PER_DAY_LABELS, weeksInPeriod } from "@/lib/packages";
 import type { PublicPlan } from "@/lib/public-data";
 import { cn } from "@/lib/utils";
 import { CtaLink } from "./cta-link";
+import { PackageOfferLine } from "./package-offer-line";
 
 const money = (cents: number, currency: string) => formatMoney(cents, currency, { hideZeroDecimals: true });
 
@@ -80,19 +81,18 @@ export function PackageCard({
       </div>
 
       {offer && plan.priceCents !== null && (
-        <p className={cn("mt-5 flex items-start gap-2 border-t pt-4 text-sm", featured ? "border-ink/15" : "border-white/15")}>
-          <Flame className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>
-            <span className="font-semibold">
-              {plan.isSubscription ? `First ${weeks} weeks ${money(offer.priceCents, currency)}` : `First week ${money(offer.priceCents, currency)}`}
-            </span>{" "}
-            <span className="text-current/60 line-through">{money(plan.priceCents, currency)}</span>
-            <span className="block text-xs text-current/60">
-              {offer.firstOrderOnly ? "New customers" : "Limited time"}
-              {offer.personal ? " · order within 2 hours" : ""}
-            </span>
-          </span>
-        </p>
+        <PackageOfferLine
+          lead={plan.isSubscription ? `First ${weeks} weeks` : "First week"}
+          price={money(offer.priceCents, currency)}
+          was={money(plan.priceCents, currency)}
+          audience={offer.firstOrderOnly ? "New customers" : "Limited time"}
+          personal={
+            offer.personal && offer.windowMinutes
+              ? { windowMinutes: offer.windowMinutes, startedAt: offer.windowStartedAt, endsAt: offer.endsAt, serverNow: offer.serverNow }
+              : null
+          }
+          featured={featured}
+        />
       )}
 
       <ul className="mt-5 space-y-2 text-sm">

@@ -1,9 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Flame } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { pad2 as pad, useOfferCountdown } from "./use-offer-countdown";
+
+/** Whether the homepage's big deal banner is on screen (true until measured). */
+function useBannerVisible(enabled: boolean) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (!enabled) return;
+    const banner = document.querySelector("[data-deal-banner]");
+    if (!banner) return; // no banner means the deal has ended for this visitor; the bar is gone too
+    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0 });
+    io.observe(banner);
+    return () => io.disconnect();
+  }, [enabled]);
+  return visible;
+}
 
 export interface OfferBarPromo {
   slug: string;
@@ -15,14 +31,16 @@ export interface OfferBarPromo {
 }
 
 /**
- * Site-wide bar for an offer with a personal deadline ("order within 2
- * hours"). The window starts the first time the visitor sees it and is kept
- * by the server, so the countdown is the same on every page and reload. It
- * disappears when the visitor's window has ended.
+ * Site-wide red bar for an offer with a personal deadline ("order within 2
+ * hours"), pinned to the top with the header so it stays visible while
+ * scrolling. On the front page it stays hidden while the big deal banner is
+ * on screen and slides in under the header once the banner scrolls away. The window starts the first time the visitor sees the offer and
+ * is kept by the server, so the countdown is the same on every page and
+ * reload. It disappears when the visitor's window has ended.
  */
 export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo; startedAt: string | null; serverNow: string }) {
   const pathname = usePathname();
-  // The homepage and the order page show their own, bigger offer card.
+  // The homepage and the order page start the visitor's window from their own, bigger offer card.
   const ownCard = pathname === "/" || pathname.startsWith("/order");
   const { remaining } = useOfferCountdown({
     windowMinutes: promo.windowMinutes,
@@ -32,7 +50,11 @@ export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo
     autoStart: !ownCard,
   });
 
-  if (remaining <= 0 || ownCard) return null;
+  // Front page: the big deal banner is the offer; the bar only slides in once it has scrolled away.
+  const isHome = pathname === "/";
+  const bannerVisible = useBannerVisible(isHome);
+
+  if (remaining <= 0 || (isHome && bannerVisible)) return null;
 
   const h = Math.floor(remaining / 3600);
   const m = Math.floor((remaining % 3600) / 60);
@@ -40,7 +62,16 @@ export function OfferBar({ promo, startedAt, serverNow }: { promo: OfferBarPromo
   const clock = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 
   return (
-    <div className="border-b border-red-700 bg-red-600 text-white" data-promotion={promo.slug} role="region" aria-label="Offer">
+    <div
+      className={cn(
+        "border-b border-red-700 bg-red-600 text-white",
+        // Out of the page flow on the front page, so its appearing doesn't shift the content.
+        isHome && "absolute inset-x-0 top-full animate-in fade-in slide-in-from-top-2 duration-300",
+      )}
+      data-promotion={promo.slug}
+      role="region"
+      aria-label="Offer"
+    >
       <Link
         href="/order"
         data-track="select_promotion"
