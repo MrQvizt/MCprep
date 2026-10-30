@@ -41,7 +41,7 @@ export function MenuCard({
   const dessert = /dessert/i.test(meal.label ?? "");
   const body = (
     <article className={cn("group flex h-full flex-col overflow-hidden bg-ink", className)}>
-      <div className="relative aspect-[4/3] overflow-hidden bg-charcoal">
+      <div className="relative aspect-square overflow-hidden bg-charcoal">
         {meal.image ? (
           <Image
             src={meal.image.url}

@@ -14,7 +14,7 @@ export function AuthShell({
   intro,
   children,
   footer,
-  image = "/images/menu/honey-sriracha-chicken-rice.webp",
+  image = "/images/dishes/honey-sriracha-chicken-rice.webp",
 }: {
   eyebrow: string;
   title: string;

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function AccountDeletedPage() {
   return (
-    <AuthShell eyebrow="Your account" title="Your account is deleted" image="/images/menu/biscoff-cheesecake.webp">
+    <AuthShell eyebrow="Your account" title="Your account is deleted" image="/images/dishes/biscoff-cheesecake.webp">
       <p className="text-base leading-relaxed text-ink/70">
         Your login and saved details are gone. Orders you placed stay with us for our records. You can still order any time, with or
         without an account.

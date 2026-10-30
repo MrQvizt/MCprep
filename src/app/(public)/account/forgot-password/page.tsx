@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
       eyebrow="Your account"
       title="Forgot your password?"
       intro="Enter the email you signed up with and we'll send you a link to choose a new one."
-      image="/images/menu/mexican-beef-bowl.webp"
+      image="/images/dishes/mexican-beef-bowl.webp"
       footer={
         <>
           Remembered it?{" "}

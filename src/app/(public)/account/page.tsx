@@ -137,7 +137,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               )}
             </div>
             <div className="relative hidden sm:block">
-              <Image src="/images/menu/honey-sriracha-chicken-rice.webp" alt="" fill sizes="12rem" className="object-cover" />
+              <Image src="/images/dishes/honey-sriracha-chicken-rice.webp" alt="" fill sizes="12rem" className="object-cover" />
             </div>
           </div>
         </div>

@@ -18,7 +18,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/ac
 
   if (!reset) {
     return (
-      <AuthShell eyebrow="Your account" title="This link has expired" image="/images/menu/mexican-beef-bowl.webp">
+      <AuthShell eyebrow="Your account" title="This link has expired" image="/images/dishes/mexican-beef-bowl.webp">
         <p className="text-base leading-relaxed text-ink/70">
           Reset links work once and only for a limited time. Ask for a new one and use it straight away.
         </p>
@@ -37,7 +37,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/ac
       eyebrow="Your account"
       title="Choose a new password"
       intro={<>For <strong className="text-ink">{reset.account.email}</strong>. You&apos;ll be signed in straight after, and signed out everywhere else.</>}
-      image="/images/menu/mexican-beef-bowl.webp"
+      image="/images/dishes/mexican-beef-bowl.webp"
     >
       <ResetPasswordForm token={token} minPassword={CUSTOMER_PASSWORD_MIN_LENGTH} />
     </AuthShell>

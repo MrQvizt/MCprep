@@ -9,7 +9,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { INTRO_OFFER, LEGACY_PLAN_SLUGS, MENU, NUTRITION_SOURCE, PACKAGES } from "./menu-and-packages";
+import { DISH_PHOTO_SIZE, INTRO_OFFER, LEGACY_PLAN_SLUGS, MENU, NUTRITION_SOURCE, PACKAGES } from "./menu-and-packages";
 
 type Db = PrismaClient;
 
@@ -31,7 +31,7 @@ function fileSize(publicUrl: string): number {
 
 /** Media asset for a photo shipped with the site (served from /public). */
 async function staticImage(db: Db, url: string, altText: string, category: "MEAL" | "GALLERY" | "BRANDING", width: number, height: number) {
-  const storageKey = `static${url}`; // e.g. static/images/menu/x.webp — never deleted from storage
+  const storageKey = `static${url}`; // e.g. static/images/dishes/x.webp — never deleted from storage
   return db.mediaAsset.upsert({
     where: { storageKey },
     update: {},
@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
     async run(db, log) {
       // 1. Menu
       for (const [i, m] of MENU.entries()) {
-        const image = await staticImage(db, m.image, m.imageAlt, "MEAL", 1000, 750);
+        const image = await staticImage(db, m.image, m.imageAlt, "MEAL", DISH_PHOTO_SIZE, DISH_PHOTO_SIZE);
         const data = {
           name: m.name,
           shortDescription: m.shortDescription,
@@ -84,7 +84,7 @@ export const RELEASES: Release[] = [
       if (gallery.every((g) => g.isDemo)) {
         await db.galleryItem.updateMany({ where: { isDemo: true }, data: { isPublished: false } });
         for (const [i, m] of MENU.entries()) {
-          const image = await staticImage(db, m.image, m.imageAlt, "MEAL", 1000, 750);
+          const image = await staticImage(db, m.image, m.imageAlt, "MEAL", DISH_PHOTO_SIZE, DISH_PHOTO_SIZE);
           const exists = await db.galleryItem.findFirst({ where: { mediaAssetId: image.id } });
           if (exists) continue;
           await db.galleryItem.create({
@@ -157,6 +157,24 @@ export const RELEASES: Release[] = [
         data: { isEnabled: true },
       });
       if (r.count > 0) log(`Offer switched on: ${INTRO_OFFER.name}`);
+    },
+  },
+  {
+    id: "2026-10-30-studio-dish-photos",
+    description: "New studio photos of the five dishes",
+    async run(db, log) {
+      for (const m of MENU) {
+        const old = await db.mediaAsset.findUnique({ where: { storageKey: `static${m.previousImage}` }, select: { id: true } });
+        if (!old) continue; // database started after the photos changed: already has the new ones
+        const fresh = await staticImage(db, m.image, m.imageAlt, "MEAL", DISH_PHOTO_SIZE, DISH_PHOTO_SIZE);
+        // Only swap where the original shipped photo is still used; photos uploaded in the admin stay.
+        const meals = await db.meal.updateMany({ where: { imageId: old.id }, data: { imageId: fresh.id } });
+        const tiles = await db.galleryItem.updateMany({
+          where: { mediaAssetId: old.id },
+          data: { mediaAssetId: fresh.id, altText: m.imageAlt },
+        });
+        if (meals.count + tiles.count > 0) log(`New photo: ${m.name}`);
+      }
     },
   },
 ];

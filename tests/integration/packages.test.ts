@@ -36,6 +36,36 @@ async function fieldErrors(promise: Promise<unknown>) {
   return (error as OrderValidationError).fieldErrors;
 }
 
+describe("studio dish photos release", () => {
+  it("swaps the photos shipped earlier for the new ones, but keeps photos uploaded in the admin", async () => {
+    // A database that ran the first releases with the earlier photos (like production).
+    const done = RELEASES.map((r) => r.id).filter((id) => id !== "2026-10-30-studio-dish-photos");
+    await db.siteSetting.create({ data: { key: "_releases", value: { applied: done } } });
+    const oldPoke = await db.mediaAsset.create({
+      data: { storageKey: "static/images/menu/chicken-poke-bowl.webp", url: "/images/menu/chicken-poke-bowl.webp", filename: "chicken-poke-bowl.webp", mimeType: "image/webp", sizeBytes: 1, category: "MEAL" },
+    });
+    const oldPasta = await db.mediaAsset.create({
+      data: { storageKey: "static/images/menu/pepper-pesto-pasta.webp", url: "/images/menu/pepper-pesto-pasta.webp", filename: "pepper-pesto-pasta.webp", mimeType: "image/webp", sizeBytes: 1, category: "MEAL" },
+    });
+    const custom = await db.mediaAsset.create({
+      data: { storageKey: "meals/2026/10/mine.webp", url: "/media/meals/2026/10/mine.webp", filename: "mine.webp", mimeType: "image/webp", sizeBytes: 1, category: "MEAL" },
+    });
+    await db.meal.create({ data: { slug: "chicken-pokebowl", name: "Chicken Poke Bowl", imageId: oldPoke.id } });
+    await db.meal.create({ data: { slug: "pepper-pesto-pasta", name: "Pepper Pesto Pasta", imageId: custom.id } }); // owner's own photo
+    await db.galleryItem.create({ data: { mediaAssetId: oldPasta.id, caption: "Pepper Pesto Pasta", altText: "old", sortOrder: 0 } });
+
+    expect(await applyReleases(db, () => {})).toEqual(["2026-10-30-studio-dish-photos"]);
+
+    const poke = await db.meal.findUniqueOrThrow({ where: { slug: "chicken-pokebowl" }, include: { image: true } });
+    expect(poke.image).toMatchObject({ url: "/images/dishes/chicken-poke-bowl.webp", width: 1200, height: 1200 });
+    const pasta = await db.meal.findUniqueOrThrow({ where: { slug: "pepper-pesto-pasta" }, include: { image: true } });
+    expect(pasta.image?.url).toBe("/media/meals/2026/10/mine.webp");
+    const tile = await db.galleryItem.findFirstOrThrow({ include: { mediaAsset: true } });
+    expect(tile.mediaAsset?.url).toBe("/images/dishes/pepper-pesto-pasta.webp");
+    expect(tile.altText).toMatch(/penne and chicken/);
+  });
+});
+
 describe("content release", () => {
   it("creates the menu, the six packages and the €6 offer once, and retires placeholder plans", async () => {
     await db.plan.create({ data: { slug: "2-weeks", name: "2 Weeks", durationDays: 14, priceCents: null } });
@@ -58,7 +88,8 @@ describe("content release", () => {
     expect(await db.plan.findUniqueOrThrow({ where: { slug: "1-month" } })).toMatchObject({ isActive: true });
     const meals = await db.meal.findMany({ include: { image: true }, orderBy: { sortOrder: "asc" } });
     expect(meals).toHaveLength(5);
-    expect(meals.every((m) => m.image?.url.startsWith("/images/menu/"))).toBe(true);
+    expect(meals.every((m) => m.image?.url.startsWith("/images/dishes/"))).toBe(true);
+    expect(meals.every((m) => m.image?.width === 1200 && m.image?.height === 1200)).toBe(true);
     expect(await db.promotion.findUniqueOrThrow({ where: { slug: "first-week-6-euro" } })).toMatchObject({
       discountType: "FIRST_WEEK_MEAL_PRICE",
       discountValue: 600,

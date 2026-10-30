@@ -35,7 +35,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/account/s
     <AuthShell
       eyebrow="Create your account"
       title={defaults ? "Save your order" : "Order faster"}
-      image="/images/menu/chicken-poke-bowl.webp"
+      image="/images/dishes/chicken-poke-bowl.webp"
       intro={
         defaults ? (
           <>

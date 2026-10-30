@@ -3,6 +3,9 @@
  * the "first week at €6 a meal" offer (all supplied by the owner, Oct 2026).
  */
 
+/** Studio photos of the dishes are square (1200 × 1200). */
+export const DISH_PHOTO_SIZE = 1200;
+
 export const MENU = [
   {
     slug: "chicken-pokebowl", // kept from the original starter content
@@ -15,8 +18,9 @@ export const MENU = [
     carbsG: 63,
     fatG: 7,
     label: "Fan favourite",
-    image: "/images/menu/chicken-poke-bowl.webp",
-    imageAlt: "Chicken Poke Bowl from MC PREPS held over a table",
+    image: "/images/dishes/chicken-poke-bowl.webp",
+    previousImage: "/images/menu/chicken-poke-bowl.webp",
+    imageAlt: "Chicken Poke Bowl from above: pulled chicken, edamame, sweetcorn, red cabbage and sweet potato with sesame",
   },
   {
     slug: "honey-sriracha-chicken-rice",
@@ -29,8 +33,9 @@ export const MENU = [
     carbsG: 64,
     fatG: 8,
     label: null,
-    image: "/images/menu/honey-sriracha-chicken-rice.webp",
-    imageAlt: "Honey Sriracha Chicken and Rice from MC PREPS",
+    image: "/images/dishes/honey-sriracha-chicken-rice.webp",
+    previousImage: "/images/menu/honey-sriracha-chicken-rice.webp",
+    imageAlt: "Honey Sriracha Chicken on white rice with sesame seeds and herbs, from above",
   },
   {
     slug: "mexican-beef-bowl",
@@ -43,8 +48,9 @@ export const MENU = [
     carbsG: 68,
     fatG: 7,
     label: null,
-    image: "/images/menu/mexican-beef-bowl.webp",
-    imageAlt: "Mexican Beef Bowl from MC PREPS",
+    image: "/images/dishes/mexican-beef-bowl.webp",
+    previousImage: "/images/menu/mexican-beef-bowl.webp",
+    imageAlt: "Mexican Beef Bowl from above: spiced beef, kidney beans and couscous with a yoghurt drizzle",
   },
   {
     slug: "pepper-pesto-pasta",
@@ -57,8 +63,9 @@ export const MENU = [
     carbsG: 72,
     fatG: 10,
     label: "45g protein",
-    image: "/images/menu/pepper-pesto-pasta.webp",
-    imageAlt: "Pepper Pesto Pasta with chicken from MC PREPS",
+    image: "/images/dishes/pepper-pesto-pasta.webp",
+    previousImage: "/images/menu/pepper-pesto-pasta.webp",
+    imageAlt: "Pepper Pesto Pasta from above: penne and chicken in a creamy pepper pesto with parsley",
   },
   {
     slug: "biscoff-cheesecake",
@@ -71,8 +78,9 @@ export const MENU = [
     carbsG: 56,
     fatG: 4,
     label: "Protein dessert",
-    image: "/images/menu/biscoff-cheesecake.webp",
-    imageAlt: "Biscoff Cheesecake protein dessert from MC PREPS",
+    image: "/images/dishes/biscoff-cheesecake.webp",
+    previousImage: "/images/menu/biscoff-cheesecake.webp",
+    imageAlt: "Biscoff Cheesecake protein dessert from above, topped with a Lotus biscuit and crumbs",
   },
 ] as const;
 
