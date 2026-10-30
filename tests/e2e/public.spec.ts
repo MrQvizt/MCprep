@@ -118,8 +118,12 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     await expect(offer).toContainText("10 meals for €60 instead of €95 — save €35");
     await expect(offer.getByRole("timer")).toBeVisible();
     await expect(offer.getByRole("link", { name: /Claim my €6 meals/ })).toHaveAttribute("href", "/order");
-    // Shown once: the small offer strip at the top of other pages is hidden here.
-    await expect(page.locator('[data-promotion="first-week-6-euro"]')).toHaveCount(1);
+    // No red bar while the big banner is on screen; it slides in under the header once the banner scrolls away.
+    const bar = page.getByRole("region", { name: "Offer", exact: true });
+    await expect(bar).toHaveCount(0);
+    await page.mouse.wheel(0, 3000);
+    await expect(bar).toBeInViewport();
+    await expect(bar.getByRole("timer")).toBeVisible();
     // Packages come straight after the hero, before the menu.
     const order = await page.evaluate(() => {
       const plans = document.getElementById("plans");
@@ -138,6 +142,15 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     const first = await timer.textContent();
     await page.waitForTimeout(1500);
     expect(await timer.textContent()).not.toBe(first); // ticking
+  });
+
+  test("the red deal bar stays on screen while scrolling other pages", async ({ page }) => {
+    await page.goto("/menu");
+    const bar = page.getByRole("region", { name: "Offer", exact: true });
+    await expect(bar).toBeInViewport();
+    await page.mouse.wheel(0, 2500);
+    await page.waitForTimeout(300);
+    await expect(bar).toBeInViewport();
   });
 
   test("the ordering deadline names the week it is for", async ({ page }) => {

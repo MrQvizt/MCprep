@@ -169,6 +169,8 @@
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
+    /* Anchor jumps land below the pinned deal bar + header. */
+    scroll-padding-top: 8rem;
     text-rendering: optimizeLegibility;
   }
   body {

@@ -101,7 +101,6 @@ export default async function PublicLayout({ children }: { children: React.React
             )}
           </div>
         )}
-        {offerBar && <OfferBar promo={offerBar} startedAt={windowStart?.toISOString() ?? null} serverNow={now.toISOString()} />}
         {cutoff && (
           <OrderCutoffBar
             cutoff={cutoff.cutoff.toISOString()}
@@ -111,15 +110,19 @@ export default async function PublicLayout({ children }: { children: React.React
             serverNow={now.toISOString()}
           />
         )}
-        <SiteHeader
-          brand={{ logoText: brand.logoText, logo: brand.logo }}
-          nav={nav}
-          ctaLabel="Build your package"
-          ctaHref="/order"
-          whatsappHref={waPlain}
-          instagramUrl={c.instagramUrl || null}
-          account={customer ? { firstName: customer.firstName } : null}
-        />
+        {/* The deal bar stays on screen with the header while scrolling. */}
+        <div className="sticky top-0 z-50">
+          {offerBar && <OfferBar promo={offerBar} startedAt={windowStart?.toISOString() ?? null} serverNow={now.toISOString()} />}
+          <SiteHeader
+            brand={{ logoText: brand.logoText, logo: brand.logo }}
+            nav={nav}
+            ctaLabel="Build your package"
+            ctaHref="/order"
+            whatsappHref={waPlain}
+            instagramUrl={c.instagramUrl || null}
+            account={customer ? { firstName: customer.firstName } : null}
+          />
+        </div>
         <main id="main" className="flex-1">
           {children}
         </main>

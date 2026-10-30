@@ -55,6 +55,7 @@ export function HeroOffer({ offer, className }: { offer: HeroOfferData; classNam
     <section
       aria-label="New customer offer"
       data-promotion={offer.slug}
+      data-deal-banner
       className={cn(
         "relative isolate overflow-hidden bg-red-600 text-white shadow-[0_30px_70px_-25px_rgba(220,38,38,0.65)] animate-in fade-in slide-in-from-top-2 duration-700",
         className,
