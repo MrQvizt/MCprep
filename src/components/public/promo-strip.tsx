@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Countdown } from "@/components/shared/countdown";
+import { PromoCountdown } from "./promo-countdown";
 import { formatPromoText } from "@/lib/promotions/format";
 import type { PublicPromotion } from "@/lib/promotions";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,9 @@ export function PromoStrip({ promo, serverNow, className, href }: { promo: Publi
             </Link>
           )}
         </div>
-        {promo.showCountdown && <Countdown endsAt={promo.endsAt} serverNow={serverNow} size="md" />}
+        {promo.showCountdown && (
+          <PromoCountdown endsAt={promo.endsAt} personalWindowMinutes={promo.personalWindowMinutes} serverNow={serverNow} size="md" />
+        )}
       </div>
     </div>
   );

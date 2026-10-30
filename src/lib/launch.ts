@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { getContent } from "@/lib/content";
-import { emailTransport, env, indexingAllowed } from "@/lib/env";
+import { emailTransport, env, indexingAllowed, storageDriverName } from "@/lib/env";
 import { normalizePhone } from "@/lib/identity";
 import { getSettings } from "@/lib/settings";
 import { getSitemapEntries } from "@/lib/seo/sitemap";
@@ -418,9 +418,14 @@ export async function getLaunchReadiness(now: Date = new Date()) {
     {
       key: "storage",
       title: "Production image storage",
-      description: "Uploaded photos must be stored in cloud storage (S3-compatible) when hosting on Vercel.",
-      status: e.STORAGE_DRIVER === "s3" ? "done" : e.VERCEL_ENV ? "todo" : "warning",
-      detail: e.STORAGE_DRIVER === "s3" ? undefined : "Using local disk storage — fine for development or a single server.",
+      description: "Uploaded photos must be kept somewhere that survives deploys: the database (default on Vercel) or S3-compatible storage.",
+      status: storageDriverName() === "local" ? (e.VERCEL_ENV ? "todo" : "warning") : "done",
+      detail:
+        storageDriverName() === "db"
+          ? "Photos are stored in your database and cached by the CDN — fine for a few hundred photos."
+          : storageDriverName() === "local"
+            ? "Using local disk storage — fine for development or a single server, not for Vercel."
+            : undefined,
       auto: true,
       href: "#developer-setup",
       hrefLabel: "Developer setup",

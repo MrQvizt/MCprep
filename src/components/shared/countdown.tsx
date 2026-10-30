@@ -67,7 +67,7 @@ export function Countdown({
 
   const parts = split(remaining);
   const units = [
-    { key: "days", label: "Days", value: parts.days },
+    ...(parts.days > 0 ? [{ key: "days", label: "Days", value: parts.days }] : []),
     { key: "hours", label: "Hours", value: parts.hours },
     { key: "minutes", label: "Min", value: parts.minutes },
     { key: "seconds", label: "Sec", value: parts.seconds },
@@ -78,7 +78,7 @@ export function Countdown({
       <div
         role="timer"
         aria-live="off"
-        aria-label={`${label}: ${parts.days} days, ${parts.hours} hours, ${parts.minutes} minutes.`}
+        aria-label={`${label}: ${parts.days > 0 ? `${parts.days} days, ` : ""}${parts.hours} hours, ${parts.minutes} minutes.`}
         className="flex items-stretch gap-2 sm:gap-3"
       >
         {units.map((u, i) => (
@@ -114,7 +114,9 @@ export function Countdown({
           </div>
         ))}
       </div>
-      <p className="min-h-[1em] text-[0.7rem] text-current/55">{endLabel ? `Ends ${endLabel} (Malta time)` : "\u00a0"}</p>
+      {parts.days > 0 && (
+        <p className="min-h-[1em] text-[0.7rem] text-current/55">{endLabel ? `Ends ${endLabel} (Malta time)` : "\u00a0"}</p>
+      )}
     </div>
   );
 }

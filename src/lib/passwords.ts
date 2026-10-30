@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 
 export const PASSWORD_MIN_LENGTH = 12;
+/** Customer portal accounts: a little shorter to keep sign-up easy. */
+export const CUSTOMER_PASSWORD_MIN_LENGTH = 10;
 const COST = 12;
 
 // Used to keep login timing similar when the email does not exist.
@@ -15,8 +17,8 @@ export async function verifyPassword(password: string, hash: string | null | und
 }
 
 /** Returns an error message, or null when the password is acceptable. */
-export function passwordProblem(password: string): string | null {
-  if (password.length < PASSWORD_MIN_LENGTH) return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+export function passwordProblem(password: string, minLength = PASSWORD_MIN_LENGTH): string | null {
+  if (password.length < minLength) return `Use at least ${minLength} characters.`;
   if (password.length > 200) return "Password is too long.";
   if (!/[a-zA-Z]/.test(password) || !/[0-9\W_]/.test(password)) return "Mix letters with numbers or symbols.";
   return null;

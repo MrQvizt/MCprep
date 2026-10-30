@@ -40,9 +40,11 @@ const rawSchema = z.object({
   badgeText: optionalText("Badge", 40),
   ctaText: requiredText("Button text", 40, 2),
   imageId: mediaIdField,
-  discountType: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
+  discountType: z.enum(["PERCENTAGE", "FIXED_AMOUNT", "FIRST_WEEK_MEAL_PRICE"]),
   discountPercent: z.string(),
   discountAmount: z.string(),
+  mealPrice: z.string(),
+  personalWindowMinutes: optionalNumber("Personal deadline", { int: true, min: 5, max: 7 * 24 * 60 }),
   maxDiscountCents: moneyField("Maximum discount"),
   audience: z.enum(AUDIENCES),
   requiresCode: z.boolean(),
@@ -73,9 +75,10 @@ export interface PromotionInput {
   badgeText: string | null;
   ctaText: string;
   imageId: string | null;
-  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
+  discountType: "PERCENTAGE" | "FIXED_AMOUNT" | "FIRST_WEEK_MEAL_PRICE";
   discountValue: number;
   maxDiscountCents: number | null;
+  personalWindowMinutes: number | null;
   audience: (typeof AUDIENCES)[number];
   requiresCode: boolean;
   code: string | null;
@@ -113,6 +116,8 @@ export function parsePromotionForm(fd: FormData, timeZone: string): PromotionInp
     discountType: fdString(fd, "discountType"),
     discountPercent: fdString(fd, "discountPercent"),
     discountAmount: fdString(fd, "discountAmount"),
+    mealPrice: fdString(fd, "mealPrice"),
+    personalWindowMinutes: fdBool(fd, "personalWindowEnabled") ? fdString(fd, "personalWindowMinutes") : "",
     maxDiscountCents: fdString(fd, "maxDiscount"),
     audience: fdString(fd, "audience"),
     requiresCode: fdBool(fd, "requiresCode"),
@@ -142,6 +147,10 @@ export function parsePromotionForm(fd: FormData, timeZone: string): PromotionInp
     const r = percentField("Discount").safeParse(raw.discountPercent);
     if (r.success) discountValue = r.data;
     else issue("discountPercent", r.error.issues[0].message);
+  } else if (raw.discountType === "FIRST_WEEK_MEAL_PRICE") {
+    const r = moneyField("First-week price per meal", true).safeParse(raw.mealPrice);
+    if (r.success && r.data !== null && r.data > 0) discountValue = r.data;
+    else issue("mealPrice", r.success ? "Enter the first-week price per meal, e.g. 6.00." : r.error.issues[0].message);
   } else {
     const r = moneyField("Discount amount", true).safeParse(raw.discountAmount);
     if (r.success && r.data !== null && r.data > 0) discountValue = r.data;
@@ -192,6 +201,7 @@ export function parsePromotionForm(fd: FormData, timeZone: string): PromotionInp
     discountType: raw.discountType,
     discountValue,
     maxDiscountCents: raw.discountType === "PERCENTAGE" ? raw.maxDiscountCents : null,
+    personalWindowMinutes: raw.personalWindowMinutes,
     audience: raw.audience,
     requiresCode,
     code: requiresCode ? code : null,

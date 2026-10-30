@@ -5,10 +5,13 @@ import { enqueueEmails, type EnqueueEmailInput } from "@/lib/email/outbox";
 import { renderBusinessOrderEmail, renderCustomerOrderEmail, type EmailBrand, type OrderEmailData } from "@/lib/email/templates";
 import { absoluteUrl } from "@/lib/env";
 import { canonicalEmail, formatPhone, normalizeEmail, normalizePhone } from "@/lib/identity";
+import { mealSelectionProblem, mealsPerWeek as packageMealsPerWeek, packageLabel } from "@/lib/packages";
 import { computeQuote, COUPON_MESSAGES, type Quote } from "@/lib/pricing";
 import { getPricingPromotions } from "@/lib/promotions";
 import { getSettings, type AllSettings } from "@/lib/settings";
-import { addDaysToDateString, zonedDateString } from "@/lib/time";
+import { cutoffConfig } from "@/lib/order-cutoff-settings";
+import { earliestStartDate, formatTime12, WEEKDAY_NAMES } from "@/lib/order-cutoff";
+import { addDaysToDateString, formatCalendarDate, zonedDateString } from "@/lib/time";
 import { whatsappLink } from "@/lib/whatsapp";
 import type { Prisma } from "@/generated/prisma/client";
 import { classifyEligibility, needsManualVerification, type CustomerHistory } from "./eligibility";
@@ -62,7 +65,19 @@ export function formatOrderReference(orderNumber: number): string {
 // ── Quotes ──────────────────────────────────────────────────────────────────
 
 export interface QuoteContext {
-  plan: { id: string; slug: string; name: string; priceCents: number | null };
+  plan: {
+    id: string;
+    slug: string;
+    name: string;
+    priceCents: number | null;
+    durationDays: number;
+    mealsIncluded: number | null;
+    mealsPerDay: number | null;
+    daysPerWeek: number | null;
+    isSubscription: boolean;
+    /** Packages only. */
+    mealsPerWeek: number | null;
+  };
   deliveryArea: { id: string; name: string; deliveryFeeCents: number | null; minOrderCents: number | null } | null;
   quote: Quote;
   minOrderShortfallCents: number | null;
@@ -77,14 +92,27 @@ export async function quoteForOrder(
     fulfillmentMethod?: "COLLECTION" | "DELIVERY";
     deliveryAreaId?: string | null;
     now: Date;
+    /** Start of the visitor's personal offer window (verified cookie), if any. */
+    offerWindowStartedAt?: Date | null;
   },
   tx: Tx | typeof db = db,
 ): Promise<QuoteContext | null> {
-  const plan = await tx.plan.findFirst({
+  const row = await tx.plan.findFirst({
     where: { slug: opts.planSlug, isActive: true, archivedAt: null },
-    select: { id: true, slug: true, name: true, priceCents: true, durationDays: true, mealsIncluded: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      priceCents: true,
+      durationDays: true,
+      mealsIncluded: true,
+      mealsPerDay: true,
+      daysPerWeek: true,
+      isSubscription: true,
+    },
   });
-  if (!plan) return null;
+  if (!row) return null;
+  const plan = { ...row, mealsPerWeek: packageMealsPerWeek(row) };
   const deliveryArea =
     opts.fulfillmentMethod === "DELIVERY" && opts.deliveryAreaId
       ? await tx.deliveryArea.findFirst({
@@ -100,6 +128,7 @@ export async function quoteForOrder(
     couponCode: opts.couponCode,
     firstOrderDeclared: opts.firstOrderDeclared,
     deliveryFeeCents: deliveryArea?.deliveryFeeCents ?? 0,
+    offerWindowStartedAt: opts.offerWindowStartedAt ?? null,
   });
   let minOrderShortfallCents: number | null = null;
   if (deliveryArea?.minOrderCents && quote.basePriceCents !== null) {
@@ -175,6 +204,10 @@ export interface CreateOrderResult {
 
 export interface CreateOrderContext {
   now?: Date;
+  /** Start of the visitor's personal offer window (verified cookie), if any. */
+  offerWindowStartedAt?: Date | null;
+  /** Signed-in customer account placing the order (links it to their portal). */
+  accountId?: string | null;
 }
 
 async function existingByKey(idempotencyKey: string): Promise<CreateOrderResult | null> {
@@ -229,9 +262,13 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
   // Preferred start date (Malta calendar)
   if (input.preferredStartDate) {
     const today = zonedDateString(now, settings.business.timeZone);
-    const earliest = addDaysToDateString(today, f.leadTimeDays);
+    const earliest = earliestStartDate(now, cutoffConfig(f), f.leadTimeDays, settings.business.timeZone);
     const latest = addDaysToDateString(today, 365);
-    if (input.preferredStartDate < earliest) errors.preferredStartDate = "Please choose a later start date.";
+    if (input.preferredStartDate < earliest) {
+      errors.preferredStartDate = f.weeklyCutoffEnabled
+        ? `The earliest start is ${formatCalendarDate(earliest)} — orders for a week close the ${WEEKDAY_NAMES[f.weeklyCutoffDay]} before at ${formatTime12(f.weeklyCutoffTime)}.`
+        : "Please choose a later start date.";
+    }
     else if (input.preferredStartDate > latest) errors.preferredStartDate = "Please choose a date within the next year.";
   }
 
@@ -267,10 +304,33 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
             fulfillmentMethod: input.fulfillmentMethod,
             deliveryAreaId: input.deliveryAreaId,
             now,
+            offerWindowStartedAt: ctx.offerWindowStartedAt ?? null,
           },
           tx,
         );
         if (!qc) throw new OrderValidationError({ planSlug: "This plan is no longer available. Please choose another." });
+
+        // Packages: the dish choices must add up to the package's meals per week.
+        let selections: { mealId: string; mealName: string; quantity: number }[] = [];
+        if (qc.plan.mealsPerWeek) {
+          const menu = await tx.meal.findMany({
+            where: { isPublished: true, archivedAt: null },
+            select: { id: true, name: true },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          });
+          const choices = input.mealSelections.filter((c) => c.quantity > 0);
+          const problem = mealSelectionProblem(
+            choices,
+            qc.plan.mealsPerWeek,
+            menu.map((m) => m.id),
+          );
+          if (problem) throw new OrderValidationError({ mealSelections: problem });
+          const byId = new Map(menu.map((m) => [m.id, m.name]));
+          selections = menu
+            .map((m) => ({ meal: m, choice: choices.find((c) => c.mealId === m.id) }))
+            .filter((x) => x.choice)
+            .map((x) => ({ mealId: x.meal.id, mealName: byId.get(x.meal.id)!, quantity: x.choice!.quantity }));
+        }
         if (input.fulfillmentMethod === "DELIVERY" && !qc.deliveryArea) {
           throw new OrderValidationError({ deliveryAreaId: "We don't currently deliver to that locality. Choose another or select collection." });
         }
@@ -371,6 +431,12 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
             planName: plan.name,
             planDurationDays: fullPlan.durationDays,
             planMealsIncluded: fullPlan.mealsIncluded,
+            planMealsPerWeek: plan.mealsPerWeek,
+            planIsSubscription: plan.isSubscription,
+            accountId: ctx.accountId ?? null,
+            mealSelections: selections.length
+              ? { create: selections.map((sel, i) => ({ ...sel, sortOrder: i })) }
+              : undefined,
             currency: settings.business.currency || "EUR",
             basePriceCents: quote.basePriceCents,
             deliveryFeeCents: quote.deliveryFeeCents,
@@ -479,6 +545,10 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
           planName: plan.name,
           planDurationDays: fullPlan.durationDays,
           planMealsIncluded: fullPlan.mealsIncluded,
+          packageLabel: packageLabel(plan) || null,
+          planIsSubscription: plan.isSubscription,
+          planMealsPerWeek: plan.mealsPerWeek,
+          mealSelections: selections.map((sel) => ({ name: sel.mealName, quantity: sel.quantity })),
           currency: order.currency,
           basePriceCents: quote.basePriceCents,
           deliveryFeeCents: quote.deliveryFeeCents,
@@ -519,7 +589,15 @@ export async function createOrderRequest(input: OrderRequest, ctx: CreateOrderCo
           });
         }
         if (settings.orderForm.sendCustomerConfirmation) {
-          const customerEmail = renderCustomerOrderEmail(emailData, brand);
+          const account = ctx.accountId
+            ? { url: absoluteUrl("/account"), saved: true }
+            : {
+                url: absoluteUrl(
+                  `/account/sign-up?ref=${encodeURIComponent(order.reference)}&t=${confirmationToken(order.id, order.idempotencyKey)}`,
+                ),
+                saved: false,
+              };
+          const customerEmail = renderCustomerOrderEmail(emailData, brand, account);
           emails.push({
             type: "ORDER_CUSTOMER_CONFIRMATION",
             dedupeKey: `order:${order.id}:customer`,

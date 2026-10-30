@@ -22,9 +22,10 @@ export function EligibilityBadge({ status }: { status: string }) {
   return <StatusBadge tone={ELIGIBILITY_TONES[status] ?? "neutral"}>{ELIGIBILITY_LABELS[status] ?? status}</StatusBadge>;
 }
 
-export function PaymentBadge({ status }: { status: string }) {
+export function PaymentBadge({ status, method }: { status: string; method?: string | null }) {
   const tone: Tone = status === "PAID" ? "good" : status === "FAILED" ? "bad" : status === "NOT_COLLECTED" ? "neutral" : "info";
-  return <StatusBadge tone={tone}>{PAYMENT_STATUS_LABELS[status] ?? status}</StatusBadge>;
+  const label = PAYMENT_STATUS_LABELS[status] ?? status;
+  return <StatusBadge tone={tone}>{status === "PAID" && method ? `${label} · ${method}` : label}</StatusBadge>;
 }
 
 export function Pagination({

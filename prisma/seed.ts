@@ -22,9 +22,8 @@ import {
   GALLERY_WORDS,
   HALLOWEEN_PROMOTION,
   LISTINGS,
-  MEAL_CHICKEN_POKEBOWL,
-  PLANS,
 } from "./seed-content";
+import { applyReleases } from "./releases";
 
 const demo = process.env.SEED_PROFILE === "demo";
 /** SEED_ONCE=1 (used by the Vercel build): seed starter content only on the first run. */
@@ -52,51 +51,6 @@ async function placeholderTile(word: string, index: number): Promise<Buffer> {
   <circle cx="960" cy="110" r="22" fill="${v.fg}" fill-opacity="0.85"/>
 </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
-}
-
-async function seedPlans() {
-  for (const plan of PLANS) {
-    const existing = await db.plan.findUnique({ where: { slug: plan.slug } });
-    if (existing) {
-      if (demo && existing.priceCents === null && existing.isDemo) {
-        await db.plan.update({ where: { id: existing.id }, data: { priceCents: plan.demoPriceCents } });
-        log(`Plan "${plan.name}": demo price set`);
-      }
-      continue;
-    }
-    await db.plan.create({
-      data: {
-        slug: plan.slug,
-        name: plan.name,
-        tagline: plan.tagline,
-        description: plan.description,
-        durationDays: plan.durationDays,
-        mealsIncluded: null, // confirm with the business
-        features: plan.features,
-        priceCents: demo ? plan.demoPriceCents : null, // never invent real prices
-        isRecommended: plan.isRecommended,
-        sortOrder: plan.sortOrder,
-        isDemo: true,
-      },
-    });
-    log(`Plan "${plan.name}" (${demo ? "demo price" : "price on request — set it in the admin"})`);
-  }
-}
-
-async function seedMeals() {
-  const m = MEAL_CHICKEN_POKEBOWL;
-  if (await db.meal.findUnique({ where: { slug: m.slug } })) return;
-  await db.meal.create({
-    data: {
-      ...m,
-      dietaryTags: [],
-      allergens: [],
-      isPublished: true,
-      sortOrder: 0,
-      isDemo: false,
-    },
-  });
-  log(`Meal "${m.name}" (nutrition from Instagram screenshot — verify)`);
 }
 
 async function seedFaqs() {
@@ -281,10 +235,9 @@ async function main() {
     // Starter content was already added once; never re-create content the owner removed.
     await seedAdmin();
     console.log("Starter content already seeded — skipped.");
+    await applyReleases(db);
     return;
   }
-  await seedPlans();
-  await seedMeals();
   await seedFaqs();
   await seedGallery();
   await seedPromotion();
@@ -297,6 +250,8 @@ async function main() {
     update: {},
   });
   await seedAdmin();
+  // Menu, packages and offers supplied by the business (also applied to existing databases).
+  await applyReleases(db);
   console.log("Done.");
 }
 

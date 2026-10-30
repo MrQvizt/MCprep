@@ -3,6 +3,7 @@
 import { AdminForm, CheckboxField, Field, FieldError, FormActions, SubmitButton } from "@/components/admin/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { WEEKDAY_NAMES } from "@/lib/order-cutoff";
 import type { SettingsOf } from "@/lib/settings/schema";
 import { saveFulfillmentSettings } from "./actions";
 
@@ -46,6 +47,30 @@ export function FulfillmentForm({ values }: { values: SettingsOf<"fulfillment"> 
         >
           {(id) => <Input id={id} name="leadTimeDays" type="number" min={0} max={60} defaultValue={values.leadTimeDays} className="max-w-32" />}
         </Field>
+      </div>
+      <div className="rounded-lg border p-4">
+        <CheckboxField
+          name="weeklyCutoffEnabled"
+          label="Weekly ordering deadline"
+          hint="Shown across the website and in the order form, e.g. “For delivery next week, order before Wednesday 4pm”. Start dates before the next deliverable week can't be chosen."
+          defaultChecked={values.weeklyCutoffEnabled}
+        />
+        <div className="mt-4 flex flex-wrap gap-4">
+          <Field label="Orders close on" name="weeklyCutoffDay">
+            {(id) => (
+              <select id={id} name="weeklyCutoffDay" defaultValue={values.weeklyCutoffDay} className="h-9 rounded-md border bg-transparent px-3 text-sm">
+                {WEEKDAY_NAMES.map((name, i) => (
+                  <option key={name} value={i}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="at (Malta time)" name="weeklyCutoffTime">
+            {(id) => <Input id={id} name="weeklyCutoffTime" type="time" defaultValue={values.weeklyCutoffTime} className="w-32" />}
+          </Field>
+        </div>
       </div>
       <FormActions>
         <SubmitButton>Save collection &amp; delivery settings</SubmitButton>

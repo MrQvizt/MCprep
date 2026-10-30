@@ -5,9 +5,9 @@ import { Section } from "./section";
 /** Compact closing call-to-action used at the end of inner pages. */
 export function CtaBand({
   title = "Ready to fuel your week?",
-  body = "Choose a plan and send your order request. No payment is taken online.",
-  ctaLabel = "Choose your plan",
-  ctaHref = "/plans",
+  body = "Build your package, pick your dishes and send your request. No payment is taken online.",
+  ctaLabel = "Build your package",
+  ctaHref = "/order",
   whatsappHref,
   tone = "paper",
 }: {

@@ -45,7 +45,7 @@ export async function ServicePage({ contentKey, pageKey }: { contentKey: Service
     content.showPlans ? getPublicPlans() : Promise.resolve([]),
     content.showMeals ? getFeaturedMeals(3) : Promise.resolve([]),
   ]);
-  const cta = isSafeHref(content.cta.href) ? content.cta : { label: "See meal plans", href: "/plans" };
+  const cta = isSafeHref(content.cta.href) ? content.cta : { label: "Build your package", href: "/order" };
   const related = SERVICE_LINKS.filter((l) => l.key !== pageKey);
 
   return (

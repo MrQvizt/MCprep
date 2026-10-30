@@ -1,4 +1,4 @@
-import { Countdown } from "@/components/shared/countdown";
+import { PromoCountdown } from "./promo-countdown";
 import { MediaImage } from "@/components/shared/media-image";
 import { formatPromoText } from "@/lib/promotions/format";
 import type { PublicPromotion } from "@/lib/promotions";
@@ -91,7 +91,7 @@ export function PromoBanner({
         </div>
         {!ended && promo.showCountdown && (
           <div className="xl:justify-self-end">
-            <Countdown endsAt={promo.endsAt} serverNow={serverNow} refreshOnEnd={!preview} />
+            <PromoCountdown endsAt={promo.endsAt} personalWindowMinutes={promo.personalWindowMinutes} serverNow={serverNow} refreshOnEnd={!preview} size="lg" />
           </div>
         )}
       </div>

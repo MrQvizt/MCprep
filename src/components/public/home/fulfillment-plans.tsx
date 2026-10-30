@@ -5,7 +5,10 @@ import type { ContentOf } from "@/lib/content/schema";
 import type { getCollectionPoints, getDeliveryAreas, PublicPlan } from "@/lib/public-data";
 import type { AllSettings } from "@/lib/settings/schema";
 import { formatWeekdays } from "@/lib/time";
+import { isPackage } from "@/lib/packages";
 import { cn } from "@/lib/utils";
+import { CtaLink } from "../cta-link";
+import { PackagesShowcase } from "../package-card";
 import { PlanCard } from "../plan-card";
 import { Reveal } from "../reveal";
 import { Section } from "../section";
@@ -133,6 +136,8 @@ export function PlansGrid({
 
 export function HomePlans({ content, plans, currency }: { content: ContentOf<"home.plans">; plans: PublicPlan[]; currency: string }) {
   if (plans.length === 0) return null;
+  const packages = plans.filter(isPackage);
+  const others = plans.filter((p) => !isPackage(p));
   return (
     <Section tone="ink" aria-labelledby="plans-title" id="plans">
       <TrackInView event="view_pricing" />
@@ -143,10 +148,14 @@ export function HomePlans({ content, plans, currency }: { content: ContentOf<"ho
         </h2>
         {content.subheading && <p className="mt-5 text-base text-white/70 sm:text-lg">{content.subheading}</p>}
       </div>
-      <PlansGrid plans={plans} currency={currency} className="mt-14 lg:mt-20" />
-      <p className="mt-10 text-center text-xs uppercase tracking-[0.16em] text-fog">
-        No payment online · We confirm every order personally
-      </p>
+      {packages.length > 0 && <PackagesShowcase plans={packages} currency={currency} className="mt-14 lg:mt-20" />}
+      {others.length > 0 && <PlansGrid plans={others} currency={currency} className="mt-14 lg:mt-20" />}
+      <div className="mt-12 flex flex-col items-center gap-4">
+        <CtaLink href="/order" size="lg">
+          Build your package
+        </CtaLink>
+        <p className="text-center text-xs uppercase tracking-[0.16em] text-fog">No payment online · We confirm every order personally</p>
+      </div>
     </Section>
   );
 }

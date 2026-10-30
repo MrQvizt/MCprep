@@ -4,7 +4,9 @@ import { connection } from "next/server";
 import { db } from "@/lib/db";
 import { absoluteUrl } from "@/lib/env";
 import { getMediaMap, MEDIA_SELECT } from "@/lib/media";
-import { computeQuote, type PricingPromotion } from "@/lib/pricing";
+import { getOfferWindowStart } from "@/lib/offer-window-server";
+import { mealsPerWeek, perMealCents } from "@/lib/packages";
+import { computeQuote, type PricingPlan, type PricingPromotion } from "@/lib/pricing";
 import { getPricingPromotions } from "@/lib/promotions";
 import { getSettings } from "@/lib/settings";
 
@@ -49,6 +51,12 @@ export interface PublicPlan {
   savingsLabel: string | null;
   isRecommended: boolean;
   isDemo: boolean;
+  /** Package builder fields (null on plans that aren't packages). */
+  mealsPerDay: number | null;
+  daysPerWeek: number | null;
+  isSubscription: boolean;
+  mealsPerWeek: number | null;
+  perMealCents: number | null;
   /** Best live offer for this plan (automatic or first-order), if any. */
   offer: {
     promotionId: string;
@@ -58,14 +66,21 @@ export interface PublicPlan {
     priceCents: number;
     firstOrderOnly: boolean;
     endsAt: string;
+    /** True when the deadline is the visitor's personal window (e.g. 2 hours). */
+    personal: boolean;
   } | null;
 }
 
-export function bestOfferForPlan(plan: { id: string; priceCents: number | null }, promotions: PricingPromotion[], now: Date) {
+/**
+ * Best live offer for a plan, for display. Personal-deadline offers are shown
+ * while the visitor's window is open — or hasn't started yet (it starts when
+ * they see it) — and hidden once their window has ended.
+ */
+export function bestOfferForPlan(plan: PricingPlan, promotions: PricingPromotion[], now: Date, offerWindowStartedAt: Date | null = null) {
   if (plan.priceCents === null) return null;
   // Evaluate as if the first-order declaration were given, to show the best possible offer
   // (labelled "first order" when it depends on verification).
-  const quote = computeQuote({ plan, promotions, now, firstOrderDeclared: true });
+  const quote = computeQuote({ plan, promotions, now, firstOrderDeclared: true, offerWindowStartedAt: offerWindowStartedAt ?? now });
   if (!quote.promotion || quote.discountCents <= 0) return null;
   return {
     promotionId: quote.promotion.id,
@@ -75,14 +90,16 @@ export function bestOfferForPlan(plan: { id: string; priceCents: number | null }
     priceCents: plan.priceCents - quote.discountCents,
     firstOrderOnly: quote.promotion.audience === "NEW_CUSTOMERS",
     endsAt: quote.promotion.endsAt.toISOString(),
+    personal: Boolean(promotions.find((p) => p.id === quote.promotion!.id)?.personalWindowMinutes),
   };
 }
 
 export const getPublicPlans = cache(async (): Promise<PublicPlan[]> => {
   const now = await requestNow();
-  const [plans, promotions] = await Promise.all([
+  const [plans, promotions, windowStart] = await Promise.all([
     db.plan.findMany({ where: { isActive: true, archivedAt: null }, orderBy: [{ sortOrder: "asc" }, { durationDays: "asc" }] }),
     getPricingPromotions(now),
+    getOfferWindowStart(now),
   ]);
   return plans.map((p) => ({
     id: p.id,
@@ -97,7 +114,12 @@ export const getPublicPlans = cache(async (): Promise<PublicPlan[]> => {
     savingsLabel: p.savingsLabel,
     isRecommended: p.isRecommended,
     isDemo: p.isDemo,
-    offer: bestOfferForPlan(p, promotions, now),
+    mealsPerDay: p.mealsPerDay,
+    daysPerWeek: p.daysPerWeek,
+    isSubscription: p.isSubscription,
+    mealsPerWeek: mealsPerWeek(p),
+    perMealCents: perMealCents(p),
+    offer: bestOfferForPlan({ ...p, mealsPerWeek: mealsPerWeek(p) }, promotions, now, windowStart),
   }));
 });
 

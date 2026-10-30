@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 import { Logo, type BrandAssetsLite } from "@/components/brand/logo";
 import { InstagramIcon, WhatsAppIcon } from "@/components/shared/icons";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -17,11 +17,14 @@ export interface NavItem {
 export function SiteHeader({
   brand,
   nav,
-  ctaLabel = "Order now",
-  ctaHref = "/plans",
+  ctaLabel = "Build your package",
+  ctaHref = "/order",
   whatsappHref,
   instagramUrl,
+  account = null,
 }: {
+  /** Signed-in customer (first name), or null when signed out. */
+  account?: { firstName: string } | null;
   brand: BrandAssetsLite;
   nav: NavItem[];
   ctaLabel?: string;
@@ -91,7 +94,7 @@ export function SiteHeader({
             <Logo brand={brand} priority />
           </Link>
 
-          <nav aria-label="Main" className="hidden lg:block">
+          <nav aria-label="Main" className="hidden xl:block">
             <ul className="flex items-center gap-7">
               {nav.map((item) => (
                 <li key={item.href}>
@@ -99,7 +102,7 @@ export function SiteHeader({
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cn(
-                      "relative text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white",
+                      "relative whitespace-nowrap text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white",
                       "after:absolute after:-bottom-1.5 after:left-0 after:h-px after:w-full after:origin-left after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:scale-x-100",
                       isActive(item.href) && "text-white after:scale-x-100",
                     )}
@@ -113,15 +116,23 @@ export function SiteHeader({
 
           <div className="flex items-center gap-2">
             <Link
+              href={account ? "/account" : "/account/sign-in"}
+              aria-current={pathname.startsWith("/account") ? "page" : undefined}
+              className="hidden h-10 items-center gap-2 px-2 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-white/75 transition-colors hover:text-white sm:inline-flex"
+            >
+              <UserRound className="size-4" aria-hidden="true" />
+              <span className="max-w-[9rem] truncate">{account ? account.firstName : "Sign in"}</span>
+            </Link>
+            <Link
               href={ctaHref}
-              className="hidden h-10 items-center bg-white px-5 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-mist sm:inline-flex"
+              className="hidden h-10 items-center whitespace-nowrap bg-white px-5 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-mist sm:inline-flex"
             >
               {ctaLabel}
             </Link>
             <button
               ref={toggleRef}
               type="button"
-              className="inline-grid size-11 place-items-center text-white lg:hidden"
+              className="inline-grid size-11 place-items-center text-white xl:hidden"
               aria-expanded={open}
               aria-controls="mobile-nav"
               aria-label="Open menu"
@@ -140,7 +151,7 @@ export function SiteHeader({
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
-        className="fixed inset-0 z-[65] overflow-y-auto bg-ink text-white lg:hidden"
+        className="fixed inset-0 z-[65] overflow-y-auto bg-ink text-white xl:hidden"
       >
         <div className="container-site flex h-16 items-center justify-between border-b border-white/10">
           <Link
@@ -187,8 +198,15 @@ export function SiteHeader({
             ))}
           </ul>
           <Link
+            href={account ? "/account" : "/account/sign-in"}
+            className="mt-6 inline-flex items-center gap-2 py-2 text-sm font-semibold uppercase tracking-[0.14em] text-white/80"
+            onClick={() => setOpenOn(null)}
+          >
+            <UserRound className="size-4" aria-hidden="true" /> {account ? "Your account" : "Sign in to your account"}
+          </Link>
+          <Link
             href={ctaHref}
-            className="mt-8 inline-flex h-14 items-center justify-center bg-white text-sm font-semibold uppercase tracking-[0.16em] text-ink"
+            className="mt-6 inline-flex h-14 items-center justify-center bg-white text-sm font-semibold uppercase tracking-[0.16em] text-ink"
           >
             {ctaLabel}
           </Link>

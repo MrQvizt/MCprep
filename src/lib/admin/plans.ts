@@ -19,6 +19,20 @@ export const planSchema = z.object({
   savingsLabel: optionalText("Savings label", 40),
   isRecommended: z.boolean(),
   isActive: z.boolean(),
+  mealsPerDay: z.union([z.literal(1), z.literal(2)]).nullable(),
+  daysPerWeek: optionalNumber("Days per week", { int: true, min: 1, max: 7 }),
+  isSubscription: z.boolean(),
+}).superRefine((v, ctx) => {
+  if (v.mealsPerDay && !v.daysPerWeek) {
+    ctx.addIssue({ code: "custom", path: ["daysPerWeek"], message: "Packages need the number of days per week." });
+  }
+  if (v.mealsPerDay && v.daysPerWeek && v.mealsIncluded && v.mealsIncluded % (v.mealsPerDay * v.daysPerWeek) !== 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["mealsIncluded"],
+      message: `Meals included should be a multiple of ${v.mealsPerDay * v.daysPerWeek} (meals per week).`,
+    });
+  }
 });
 
 export type PlanInput = z.infer<typeof planSchema>;
@@ -36,6 +50,12 @@ export function parsePlanForm(fd: FormData) {
     savingsLabel: fdString(fd, "savingsLabel"),
     isRecommended: fdBool(fd, "isRecommended"),
     isActive: fdBool(fd, "isActive"),
+    mealsPerDay: (() => {
+      const v = fdString(fd, "mealsPerDay");
+      return v === "1" ? 1 : v === "2" ? 2 : null;
+    })(),
+    daysPerWeek: fdString(fd, "mealsPerDay") ? fdString(fd, "daysPerWeek") : "",
+    isSubscription: fdBool(fd, "isSubscription"),
   });
 }
 

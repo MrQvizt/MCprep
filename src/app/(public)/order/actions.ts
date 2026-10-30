@@ -4,31 +4,15 @@ import { after } from "next/server";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/actions";
 import { processOutbox } from "@/lib/email/outbox";
 import { orderRequestSchema, quoteRequestSchema, type OrderRequestInput, type QuoteRequest } from "@/lib/orders/schema";
+import { getOfferWindowStart } from "@/lib/offer-window-server";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 import { createOrderRequest, OrderValidationError, quoteForOrder } from "@/lib/orders/service";
-import { COUPON_MESSAGES, discountLabel, type CouponStatus } from "@/lib/pricing";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/request";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { toQuoteView, type QuoteView } from "./quote-view";
 
-export interface QuoteView {
-  planName: string;
-  basePriceCents: number | null;
-  discountCents: number;
-  deliveryFeeCents: number;
-  totalCents: number | null;
-  promotion: {
-    name: string;
-    label: string;
-    endsAt: string;
-    audience: "ALL_CUSTOMERS" | "NEW_CUSTOMERS" | "SELECTED_CUSTOMERS";
-  } | null;
-  requiresVerification: boolean;
-  couponStatus: CouponStatus;
-  couponMessage: string;
-  firstOrderOffer: { name: string; discountCents: number; endsAt: string } | null;
-  minOrderShortfallCents: number | null;
-  deliveryAreaName: string | null;
-}
+export type { QuoteView };
 
 /** Live price summary for the order form. Calculated on the server only. */
 export async function getQuoteAction(input: QuoteRequest): Promise<QuoteView | null> {
@@ -36,36 +20,10 @@ export async function getQuoteAction(input: QuoteRequest): Promise<QuoteView | n
   if (!parsed.success) return null;
   const limited = await rateLimit(`quote:${await clientIp()}`, 120, 60);
   if (!limited.ok) return null;
-  const qc = await quoteForOrder({ ...parsed.data, now: new Date() });
+  const now = new Date();
+  const qc = await quoteForOrder({ ...parsed.data, now, offerWindowStartedAt: await getOfferWindowStart(now) });
   if (!qc) return null;
-  const q = qc.quote;
-  return {
-    planName: qc.plan.name,
-    basePriceCents: q.basePriceCents,
-    discountCents: q.discountCents,
-    deliveryFeeCents: q.deliveryFeeCents,
-    totalCents: q.totalCents,
-    promotion: q.promotion
-      ? {
-          name: q.promotion.name,
-          label: discountLabel(q.promotion),
-          endsAt: q.promotion.endsAt.toISOString(),
-          audience: q.promotion.audience,
-        }
-      : null,
-    requiresVerification: q.requiresVerification,
-    couponStatus: q.couponStatus,
-    couponMessage: COUPON_MESSAGES[q.couponStatus],
-    firstOrderOffer: q.availableFirstOrderOffer
-      ? {
-          name: q.availableFirstOrderOffer.name,
-          discountCents: q.availableFirstOrderOffer.discountCents,
-          endsAt: q.availableFirstOrderOffer.endsAt.toISOString(),
-        }
-      : null,
-    minOrderShortfallCents: qc.minOrderShortfallCents,
-    deliveryAreaName: qc.deliveryArea?.name ?? null,
-  };
+  return toQuoteView(qc);
 }
 
 const GENERIC_ERROR = "We couldn't send your order request. Please try again, or message us on WhatsApp.";
@@ -92,7 +50,9 @@ export async function submitOrderAction(input: OrderRequestInput): Promise<Actio
   }
 
   try {
-    const result = await createOrderRequest(data);
+    const now = new Date();
+    const [offerWindowStartedAt, customer] = await Promise.all([getOfferWindowStart(now), getCurrentCustomer()]);
+    const result = await createOrderRequest(data, { now, offerWindowStartedAt, accountId: customer?.id ?? null });
     if (result.emailIds.length > 0) {
       // Best-effort immediate delivery; failures stay queued for retry.
       after(() => processOutbox({ ids: result.emailIds }).catch((e) => console.error("[order] email send failed", e)));

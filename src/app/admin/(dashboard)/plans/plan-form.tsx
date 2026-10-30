@@ -22,6 +22,9 @@ export interface PlanFormValues {
   savingsLabel: string | null;
   isRecommended: boolean;
   isActive: boolean;
+  mealsPerDay: number | null;
+  daysPerWeek: number | null;
+  isSubscription: boolean;
 }
 
 export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orderCount?: number }) {
@@ -31,7 +34,7 @@ export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orde
     <AdminForm action={savePlan.bind(null, plan?.id ?? null)} className="space-y-6">
       <AdminCard title="Plan">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Plan name" name="name" required hint="e.g. 1 Week, 2 Weeks, 1 Month">
+          <Field label="Plan name" name="name" required hint="e.g. Lunch + Dinner · 5 days">
             {(id) => (
               <Input
                 id={id}
@@ -42,7 +45,7 @@ export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orde
               />
             )}
           </Field>
-          <Field label="Short code" name="slug" required hint="Used in order links, e.g. /order?plan=2-weeks">
+          <Field label="Short code" name="slug" required hint="Used in order links, e.g. /order?plan=lunch-dinner-5-days">
             {(id) => (
               <Input
                 id={id}
@@ -73,6 +76,39 @@ export function PlanForm({ plan, orderCount = 0 }: { plan?: PlanFormValues; orde
           <Field label="What's included" name="features" hint="One item per line. Shown as ticks on the pricing card.">
             {(id) => <Textarea id={id} name="features" defaultValue={plan?.features.join("\n") ?? ""} rows={5} />}
           </Field>
+        </div>
+      </AdminCard>
+
+      <AdminCard
+        title="Package builder"
+        description="Packages appear in “Build your package” on the website: customers pick lunch or lunch + dinner, 5 or 7 days, and weekly or monthly. Leave “Not a package” for other plans."
+      >
+        <div className="grid gap-5 sm:grid-cols-3">
+          <Field label="Meals per day" name="mealsPerDay">
+            {(id) => (
+              <select
+                id={id}
+                name="mealsPerDay"
+                defaultValue={plan?.mealsPerDay ? String(plan.mealsPerDay) : ""}
+                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              >
+                <option value="">Not a package</option>
+                <option value="1">Lunch (1 a day)</option>
+                <option value="2">Lunch + Dinner (2 a day)</option>
+              </select>
+            )}
+          </Field>
+          <Field label="Days per week" name="daysPerWeek" hint="5 (Mon–Fri) or 7">
+            {(id) => <Input id={id} name="daysPerWeek" inputMode="numeric" defaultValue={plan?.daysPerWeek ?? ""} />}
+          </Field>
+          <div className="pt-6">
+            <CheckboxField
+              name="isSubscription"
+              label="Monthly subscription"
+              hint="Renews every “length in days” (use 28 for monthly)."
+              defaultChecked={plan?.isSubscription ?? false}
+            />
+          </div>
         </div>
       </AdminCard>
 

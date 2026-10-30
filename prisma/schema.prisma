@@ -91,33 +91,33 @@ enum MediaCategory {
 }
 
 model MediaAsset {
-  id           String        @id @default(cuid())
-  storageKey   String        @unique
-  url          String
-  filename     String
-  mimeType     String
-  sizeBytes    Int
-  width        Int?
-  height       Int?
-  altText      String?
-  caption      String?
-  category     MediaCategory @default(GENERAL)
-  isPlaceholder Boolean      @default(false) // generated placeholder art, replace before launch
-  uploadedById String?
-  uploadedBy   AdminUser?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  id            String        @id @default(cuid())
+  storageKey    String        @unique
+  url           String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  width         Int?
+  height        Int?
+  altText       String?
+  caption       String?
+  category      MediaCategory @default(GENERAL)
+  isPlaceholder Boolean       @default(false) // generated placeholder art, replace before launch
+  uploadedById  String?
+  uploadedBy    AdminUser?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
-  mealsPrimary       Meal[]                        @relation("MealPrimaryImage")
-  mealImages         MealImage[]
-  galleryItems       GalleryItem[]
-  promotions         Promotion[]
-  blogCovers         BlogPost[]                    @relation("BlogCover")
-  blogOgImages       BlogPost[]                    @relation("BlogOgImage")
-  seoOgImages        SEOPageMetadata[]
-  testimonials       Testimonial[]
-  landingHeroes      SeasonalCampaignLandingPage[] @relation("LandingHero")
-  landingOgImages    SeasonalCampaignLandingPage[] @relation("LandingOg")
+  mealsPrimary    Meal[]                        @relation("MealPrimaryImage")
+  mealImages      MealImage[]
+  galleryItems    GalleryItem[]
+  promotions      Promotion[]
+  blogCovers      BlogPost[]                    @relation("BlogCover")
+  blogOgImages    BlogPost[]                    @relation("BlogOgImage")
+  seoOgImages     SEOPageMetadata[]
+  testimonials    Testimonial[]
+  landingHeroes   SeasonalCampaignLandingPage[] @relation("LandingHero")
+  landingOgImages SeasonalCampaignLandingPage[] @relation("LandingOg")
 
   @@index([category])
   @@index([createdAt])
@@ -128,36 +128,37 @@ model MediaAsset {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Meal {
-  id               String      @id @default(cuid())
-  name             String
-  slug             String      @unique
-  shortDescription String?
-  description      String?
-  imageId          String?
-  image            MediaAsset? @relation("MealPrimaryImage", fields: [imageId], references: [id], onDelete: SetNull)
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  shortDescription  String?
+  description       String?
+  imageId           String?
+  image             MediaAsset? @relation("MealPrimaryImage", fields: [imageId], references: [id], onDelete: SetNull)
   // Nutrition: leave blank until verified. Never invent values.
-  calories         Int?
-  proteinG         Float?
-  carbsG           Float?
-  fatG             Float?
-  servingSize      String?
-  ingredients      String?
-  nutritionSource  String? // where the figures came from, e.g. "Brand Instagram post"
-  nutritionVerified Boolean    @default(false)
-  dietaryTags      String[]    @default([])
-  allergens        String[]    @default([]) // EU 14 allergens, only when provided by the business
-  label            String? // optional badge e.g. "Popular"
-  isFeatured       Boolean     @default(false)
-  isPublished      Boolean     @default(true)
-  archivedAt       DateTime?   @db.Timestamptz(3)
-  sortOrder        Int         @default(0)
-  isDemo           Boolean     @default(false)
-  seoTitle         String?
-  seoDescription   String?
-  createdAt        DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime    @updatedAt @db.Timestamptz(3)
+  calories          Int?
+  proteinG          Float?
+  carbsG            Float?
+  fatG              Float?
+  servingSize       String?
+  ingredients       String?
+  nutritionSource   String? // where the figures came from, e.g. "Brand Instagram post"
+  nutritionVerified Boolean     @default(false)
+  dietaryTags       String[]    @default([])
+  allergens         String[]    @default([]) // EU 14 allergens, only when provided by the business
+  label             String? // optional badge e.g. "Popular"
+  isFeatured        Boolean     @default(false)
+  isPublished       Boolean     @default(true)
+  archivedAt        DateTime?   @db.Timestamptz(3)
+  sortOrder         Int         @default(0)
+  isDemo            Boolean     @default(false)
+  seoTitle          String?
+  seoDescription    String?
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(3)
 
-  images MealImage[]
+  images          MealImage[]
+  orderSelections OrderMealSelection[]
 
   @@index([isPublished, archivedAt, sortOrder])
   @@index([isFeatured])
@@ -176,24 +177,28 @@ model MealImage {
 }
 
 model Plan {
-  id               String    @id @default(cuid())
-  name             String // "1 Week"
-  slug             String    @unique
-  tagline          String? // "Starter", "Popular", "Commitment"
-  description      String?
-  durationDays     Int
-  mealsIncluded    Int?
-  features         String[]  @default([])
+  id             String    @id @default(cuid())
+  name           String // "1 Week"
+  slug           String    @unique
+  tagline        String? // "Starter", "Popular", "Commitment"
+  description    String?
+  durationDays   Int
+  mealsIncluded  Int?
+  features       String[]  @default([])
   // null = price on request (shown as "Price confirmed on request")
-  priceCents       Int?
-  savingsLabel     String?
-  isRecommended    Boolean   @default(false)
-  isActive         Boolean   @default(true)
-  archivedAt       DateTime? @db.Timestamptz(3)
-  sortOrder        Int       @default(0)
-  isDemo           Boolean   @default(false)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+  priceCents     Int?
+  savingsLabel   String?
+  isRecommended  Boolean   @default(false)
+  isActive       Boolean   @default(true)
+  archivedAt     DateTime? @db.Timestamptz(3)
+  sortOrder      Int       @default(0)
+  isDemo         Boolean   @default(false)
+  // Package builder ("build your package"): set on packages, null on legacy plans.
+  mealsPerDay    Int? // 1 = lunch, 2 = lunch + dinner
+  daysPerWeek    Int? // 5 or 7
+  isSubscription Boolean   @default(false) // renews every durationDays (e.g. monthly = 28 days)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
 
   orders         Order[]
   promotionPlans PromotionEligiblePlan[]
@@ -264,23 +269,23 @@ enum CustomerManualStatus {
 }
 
 model Customer {
-  id            String                @id @default(cuid())
-  name          String
-  email         String? // latest normalised email
-  phone         String? // latest E.164 phone
-  manualStatus  CustomerManualStatus?
-  notes         String?
-  firstOrderAt  DateTime?             @db.Timestamptz(3)
-  lastOrderAt   DateTime?             @db.Timestamptz(3)
-  anonymizedAt  DateTime?             @db.Timestamptz(3)
-  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+  id           String                @id @default(cuid())
+  name         String
+  email        String? // latest normalised email
+  phone        String? // latest E.164 phone
+  manualStatus CustomerManualStatus?
+  notes        String?
+  firstOrderAt DateTime?             @db.Timestamptz(3)
+  lastOrderAt  DateTime?             @db.Timestamptz(3)
+  anonymizedAt DateTime?             @db.Timestamptz(3)
+  createdAt    DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime              @updatedAt @db.Timestamptz(3)
 
-  identities           CustomerIdentity[]
-  orders               Order[]
-  redemptions          PromotionRedemption[]
-  marketingConsents    MarketingConsent[]
-  selectedPromotions   PromotionSelectedCustomer[]
+  identities         CustomerIdentity[]
+  orders             Order[]
+  redemptions        PromotionRedemption[]
+  marketingConsents  MarketingConsent[]
+  selectedPromotions PromotionSelectedCustomer[]
 
   @@index([email])
   @@index([phone])
@@ -310,6 +315,7 @@ model CustomerIdentity {
 enum DiscountType {
   PERCENTAGE // discountValue in basis points (2000 = 20%)
   FIXED_AMOUNT // discountValue in cents
+  FIRST_WEEK_MEAL_PRICE // discountValue = price per meal in cents for the first week of a package
 }
 
 enum PromotionAudience {
@@ -336,38 +342,41 @@ enum ExpiredBehavior {
 }
 
 model Promotion {
-  id                   String            @id @default(cuid())
-  name                 String
-  slug                 String            @unique
-  theme                SeasonalTheme     @default(NONE)
-  headline             String
-  subheadline          String?
-  description          String?
-  badgeText            String?
-  ctaText              String            @default("Claim your offer")
-  imageId              String?
-  image                MediaAsset?       @relation(fields: [imageId], references: [id], onDelete: SetNull)
-  discountType         DiscountType
-  discountValue        Int
-  maxDiscountCents     Int?
-  audience             PromotionAudience @default(ALL_CUSTOMERS)
-  requiresCode         Boolean           @default(false)
-  code                 String?           @unique // stored upper-case
-  appliesToAllPlans    Boolean           @default(true)
-  startsAt             DateTime          @db.Timestamptz(3)
-  endsAt               DateTime          @db.Timestamptz(3)
-  isEnabled            Boolean           @default(false)
-  showCountdown        Boolean           @default(true)
-  showOnHomepage       Boolean           @default(true)
-  priority             Int               @default(0)
-  totalRedemptionLimit Int?
-  perCustomerLimit     Int?              @default(1)
-  terms                String?
-  expiredBehavior      ExpiredBehavior   @default(HIDE)
-  expiredMessage       String?
-  isDemo               Boolean           @default(false)
-  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  id                    String            @id @default(cuid())
+  name                  String
+  slug                  String            @unique
+  theme                 SeasonalTheme     @default(NONE)
+  headline              String
+  subheadline           String?
+  description           String?
+  badgeText             String?
+  ctaText               String            @default("Claim your offer")
+  imageId               String?
+  image                 MediaAsset?       @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  discountType          DiscountType
+  discountValue         Int
+  maxDiscountCents      Int?
+  audience              PromotionAudience @default(ALL_CUSTOMERS)
+  requiresCode          Boolean           @default(false)
+  code                  String?           @unique // stored upper-case
+  appliesToAllPlans     Boolean           @default(true)
+  startsAt              DateTime          @db.Timestamptz(3)
+  endsAt                DateTime          @db.Timestamptz(3)
+  isEnabled             Boolean           @default(false)
+  showCountdown         Boolean           @default(true)
+  showOnHomepage        Boolean           @default(true)
+  priority              Int               @default(0)
+  totalRedemptionLimit  Int?
+  perCustomerLimit      Int?              @default(1)
+  terms                 String?
+  expiredBehavior       ExpiredBehavior   @default(HIDE)
+  expiredMessage        String?
+  // Personal deadline: the offer is valid for this many minutes from when a
+  // visitor first sees it (signed cookie, enforced on the server). Null = off.
+  personalWindowMinutes Int?
+  isDemo                Boolean           @default(false)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(3)
 
   eligiblePlans      PromotionEligiblePlan[]
   redemptions        PromotionRedemption[]
@@ -431,19 +440,19 @@ enum EligibilityStatus {
 }
 
 model PromotionEligibilityReview {
-  id              String            @id @default(cuid())
+  id              String             @id @default(cuid())
   orderId         String
-  order           Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order           Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   promotionId     String
-  promotion       Promotion         @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  promotion       Promotion          @relation(fields: [promotionId], references: [id], onDelete: Restrict)
   automatedResult EligibilityStatus
-  reasons         String[]          @default([])
+  reasons         String[]           @default([])
   decision        EligibilityStatus?
   decidedById     String?
-  decidedBy       AdminUser?        @relation(fields: [decidedById], references: [id], onDelete: SetNull)
-  decidedAt       DateTime?         @db.Timestamptz(3)
+  decidedBy       AdminUser?         @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt       DateTime?          @db.Timestamptz(3)
   note            String?
-  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
 
   @@index([orderId])
   @@index([promotionId])
@@ -565,31 +574,33 @@ model Order {
   notes               String?
 
   // Pricing snapshot — never recalculated after submission
-  planId            String?
-  plan              Plan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
-  planName          String
-  planDurationDays  Int
-  planMealsIncluded Int?
-  currency          String        @default("EUR")
-  basePriceCents    Int? // null = price on request
-  deliveryFeeCents  Int           @default(0)
-  discountCents     Int           @default(0)
-  totalCents        Int? // quoted (requested) total
+  planId              String?
+  plan                Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName            String
+  planDurationDays    Int
+  planMealsIncluded   Int?
+  planMealsPerWeek    Int? // packages: meals per week (dish choices add up to this)
+  planIsSubscription  Boolean @default(false)
+  currency            String  @default("EUR")
+  basePriceCents      Int? // null = price on request
+  deliveryFeeCents    Int     @default(0)
+  discountCents       Int     @default(0)
+  totalCents          Int? // quoted (requested) total
   confirmedTotalCents Int? // set by the team when the final price is agreed
 
   // Promotion snapshot
-  promotionId        String?
-  promotion          Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
-  promotionName      String?
-  promotionCode      String?
+  promotionId            String?
+  promotion              Promotion?         @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionName          String?
+  promotionCode          String?
   promotionDiscountType  DiscountType?
   promotionDiscountValue Int?
-  promotionEndsAt    DateTime?         @db.Timestamptz(3)
-  promotionAudience  PromotionAudience?
-  eligibilityStatus  EligibilityStatus @default(NOT_REQUIRED)
-  eligibilityReasons String[]          @default([])
-  isReturningCustomer Boolean          @default(false)
-  isPotentialDuplicate Boolean         @default(false)
+  promotionEndsAt        DateTime?          @db.Timestamptz(3)
+  promotionAudience      PromotionAudience?
+  eligibilityStatus      EligibilityStatus  @default(NOT_REQUIRED)
+  eligibilityReasons     String[]           @default([])
+  isReturningCustomer    Boolean            @default(false)
+  isPotentialDuplicate   Boolean            @default(false)
 
   // Consent evidence
   privacyAcknowledgedAt DateTime  @db.Timestamptz(3)
@@ -606,6 +617,10 @@ model Order {
   utmTerm      String?
   utmContent   String?
 
+  // Customer portal: set when placed while signed in, or claimed with the private confirmation link.
+  accountId String?
+  account   CustomerAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
   // Customer-facing confirmation page access (hashed random token)
   confirmationTokenHash String?   @unique
   confirmationExpiresAt DateTime? @db.Timestamptz(3)
@@ -618,6 +633,7 @@ model Order {
   updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
   statusHistory      OrderStatusHistory[]
+  mealSelections     OrderMealSelection[]
   internalNotes      OrderNote[]
   redemption         PromotionRedemption?
   eligibilityReviews PromotionEligibilityReview[]
@@ -632,6 +648,22 @@ model Order {
   @@index([customerId])
   @@index([promotionId])
   @@index([planId])
+  @@index([accountId])
+}
+
+/// Dishes the customer chose for their package (per week), snapshotted at order time.
+model OrderMealSelection {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mealId    String?
+  meal      Meal?   @relation(fields: [mealId], references: [id], onDelete: SetNull)
+  mealName  String
+  quantity  Int
+  sortOrder Int     @default(0)
+
+  @@index([orderId])
+  @@index([mealId])
 }
 
 model OrderStatusHistory {
@@ -675,6 +707,7 @@ enum EmailStatus {
 enum EmailType {
   ORDER_BUSINESS_NOTIFICATION
   ORDER_CUSTOMER_CONFIRMATION
+  ACCOUNT_PASSWORD_RESET
   TEST
 }
 
@@ -734,19 +767,19 @@ model MarketingConsent {
 }
 
 model TrackingAttribution {
-  id           String   @id @default(cuid())
-  orderId      String   @unique
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  landingPath  String?
-  referrerHost String?
-  utmSource    String?
-  utmMedium    String?
-  utmCampaign  String?
-  utmTerm      String?
-  utmContent   String?
+  id            String    @id @default(cuid())
+  orderId       String    @unique
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  landingPath   String?
+  referrerHost  String?
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+  utmTerm       String?
+  utmContent    String?
   promotionSlug String?
-  firstSeenAt  DateTime? @db.Timestamptz(3)
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  firstSeenAt   DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([utmSource])
   @@index([utmCampaign])
@@ -755,18 +788,18 @@ model TrackingAttribution {
 // First-party, cookieless event log. Never contains names, emails, phones,
 // addresses or allergy information.
 model AnalyticsEvent {
-  id           String   @id @default(cuid())
-  name         String // page_view, view_meal, select_plan, click_whatsapp …
-  path         String?
-  referrerHost String?
-  utmSource    String?
-  utmMedium    String?
-  utmCampaign  String?
-  planSlug     String?
-  mealSlug     String?
+  id            String   @id @default(cuid())
+  name          String // page_view, view_meal, select_plan, click_whatsapp …
+  path          String?
+  referrerHost  String?
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+  planSlug      String?
+  mealSlug      String?
   promotionSlug String?
-  device       String? // "mobile" | "desktop" | "tablet"
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  device        String? // "mobile" | "desktop" | "tablet"
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([name, createdAt])
   @@index([createdAt])
@@ -963,10 +996,71 @@ model SiteHealthCheck {
 
 // Owner checklists (launch readiness & monthly routine) — manual ticks.
 model ChecklistItemState {
-  key         String    @id // e.g. "launch.gbp_claimed", "monthly.2026-11.review_performance"
-  done        Boolean   @default(false)
-  doneAt      DateTime? @db.Timestamptz(3)
-  doneById    String?
-  note        String?
-  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  key       String    @id // e.g. "launch.gbp_claimed", "monthly.2026-11.review_performance"
+  done      Boolean   @default(false)
+  doneAt    DateTime? @db.Timestamptz(3)
+  doneById  String?
+  note      String?
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer portal: accounts and sessions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A customer's sign-in for the portal. Orders appear in the portal only when
+/// they were placed while signed in or claimed with their private
+/// confirmation link — never just because an email address matches.
+model CustomerAccount {
+  id             String    @id @default(cuid())
+  email          String    @unique // normalised (lower-case)
+  name           String
+  phone          String?
+  passwordHash   String
+  // Incremented on password change / sign-out everywhere to revoke sessions.
+  sessionVersion Int       @default(1)
+  lastLoginAt    DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  sessions CustomerSession[]
+  resets   CustomerPasswordReset[]
+  orders   Order[]
+}
+
+model CustomerSession {
+  id             String          @id @default(cuid())
+  accountId      String
+  account        CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash      String          @unique // SHA-256 of the cookie token
+  sessionVersion Int
+  expiresAt      DateTime        @db.Timestamptz(3)
+  lastSeenAt     DateTime        @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+model CustomerPasswordReset {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash   String          @unique
+  expiresAt   DateTime        @db.Timestamptz(3)
+  usedAt      DateTime?       @db.Timestamptz(3)
+  createdById String? // admin who created the link (null = requested by email)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([accountId])
+}
+
+/// Uploaded image bytes, used when no S3-compatible storage is configured
+/// (the default on Vercel, whose disk is read-only). Served from /media/<key>.
+model StoredFile {
+  key         String   @id
+  contentType String
+  sizeBytes   Int
+  data        Bytes
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 }

@@ -58,12 +58,12 @@ export const STATIC_PAGES = [
   {
     key: "plans",
     path: "/plans",
-    label: "Plans & Pricing",
-    defaultTitle: "Meal Plans & Prices | 1 Week, 2 Weeks or 1 Month | MC PREPS Malta",
+    label: "Packages & Pricing",
+    defaultTitle: "Meal Prep Packages & Prices | Lunch or Lunch + Dinner | MC PREPS Malta",
     defaultDescription:
-      "Compare MC PREPS meal plans in Malta — 1 week, 2 weeks or 1 month. Choose a plan, send your order request and we'll confirm the details with you.",
+      "Build your MC PREPS meal prep package in Malta — lunch, or lunch and dinner, 5 or 7 days, weekly or monthly. Pick your dishes and we'll confirm the details with you.",
     primaryTopic: "meal plans Malta",
-    breadcrumb: "Plans & Pricing",
+    breadcrumb: "Packages",
     indexable: true,
     priority: 0.9,
     changeFrequency: "weekly",
@@ -201,9 +201,9 @@ export const STATIC_PAGES = [
     key: "meal-plans-malta",
     path: "/meal-plans-malta",
     label: "Meal Plans Malta",
-    defaultTitle: "Meal Plans Malta | Which Plan Is Right for You? | MC PREPS",
+    defaultTitle: "Meal Plans Malta | Which Package Is Right for You? | MC PREPS",
     defaultDescription:
-      "Compare 1-week, 2-week and 1-month meal plans from MC PREPS in Malta and find the one that fits your training and schedule.",
+      "Lunch, or lunch and dinner — weekly or monthly. Compare MC PREPS meal prep packages in Malta and find the one that fits your training and schedule.",
     primaryTopic: "meal plans Malta",
     breadcrumb: "Meal Plans Malta",
     indexable: true,

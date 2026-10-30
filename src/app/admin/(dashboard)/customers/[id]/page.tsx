@@ -5,6 +5,7 @@ import { ConfirmAction } from "@/components/admin/confirm-action";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Button } from "@/components/ui/button";
+import { findWebsiteAccounts } from "@/lib/admin/customer-accounts";
 import { customerStatus, getCustomerDetail } from "@/lib/admin/customers";
 import { AREA_ROLES, requireAdmin } from "@/lib/authz";
 import { formatPhone } from "@/lib/identity";
@@ -13,7 +14,7 @@ import { getSettings } from "@/lib/settings";
 import { formatDateTime } from "@/lib/time";
 import { DetailRow, EligibilityBadge, OrderStatusBadge } from "../../orders/order-ui";
 import { anonymizeCustomerAction, withdrawConsentAction } from "../actions";
-import { CustomerNotesForm, CustomerStatusForm } from "./customer-forms";
+import { CustomerNotesForm, CustomerStatusForm, WebsiteAccountTools } from "./customer-forms";
 
 export const metadata = { title: "Customer" };
 
@@ -30,6 +31,9 @@ export default async function CustomerDetailPage({ params, searchParams }: PageP
   const sp = await searchParams;
   const [customer, settings] = await Promise.all([getCustomerDetail(id), getSettings()]);
   if (!customer) notFound();
+  const accounts = customer.anonymizedAt
+    ? []
+    : await findWebsiteAccounts({ email: customer.email, orderIds: customer.orders.map((o) => o.id) });
   const tz = settings.business.timeZone;
   const status = customerStatus(customer);
   const anonymised = Boolean(customer.anonymizedAt);
@@ -185,6 +189,29 @@ export default async function CustomerDetailPage({ params, searchParams }: PageP
         </div>
 
         <div className="space-y-6">
+          {!anonymised && (
+            <AdminCard
+              title={accounts.length > 1 ? "Website accounts" : "Website account"}
+              description={accounts.length ? undefined : "They haven't created an account on the website. They can still order without one."}
+            >
+              {accounts.length > 0 ? (
+                <div className="space-y-6">
+                  {accounts.map((account) => (
+                    <section key={account.id} aria-label={`Website account ${account.email}`} className="space-y-4 border-t pt-4 first:border-t-0 first:pt-0">
+                      <dl>
+                        <DetailRow label="Login email">{account.email}</DetailRow>
+                        <DetailRow label="Name">{account.name}</DetailRow>
+                        <DetailRow label="Created">{formatDateTime(account.createdAt, tz, { dateStyle: "medium" })}</DetailRow>
+                        <DetailRow label="Last sign-in">{account.lastLoginAt ? formatDateTime(account.lastLoginAt, tz) : "Never"}</DetailRow>
+                        <DetailRow label="Orders saved">{String(account._count.orders)}</DetailRow>
+                      </dl>
+                      <WebsiteAccountTools customerId={customer.id} accountId={account.id} email={account.email} />
+                    </section>
+                  ))}
+                </div>
+              ) : null}
+            </AdminCard>
+          )}
           {!anonymised && (
             <AdminCard title="Customer type">
               <CustomerStatusForm key={customer.manualStatus ?? "AUTO"} customerId={customer.id} current={customer.manualStatus ?? "AUTO"} />

@@ -2,7 +2,8 @@ import { Info, Utensils } from "lucide-react";
 import { ClickTracking } from "@/components/public/click-tracking";
 import { CtaBand } from "@/components/public/cta-band";
 import { MealSpotlight } from "@/components/public/home/meals-steps";
-import { MealCard } from "@/components/public/meal-card";
+import { CtaLink } from "@/components/public/cta-link";
+import { MenuCard } from "@/components/public/menu-card";
 import { PageHero } from "@/components/public/page-hero";
 import { Reveal } from "@/components/public/reveal";
 import { Section } from "@/components/public/section";
@@ -41,9 +42,30 @@ export default async function MenuPage() {
           <ul className="grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {meals.map((meal, i) => (
               <Reveal as="li" key={meal.id} delay={(i % 3) * 70}>
-                <MealCard meal={meal} className="h-full" priority={i < 3} />
+                <MenuCard
+                  meal={{ ...meal, image: meal.image ?? meal.images[0]?.mediaAsset ?? null }}
+                  index={i}
+                  total={meals.length}
+                  priority={i < 3}
+                  headingLevel="h2"
+                  className="h-full"
+                />
               </Reveal>
             ))}
+            <Reveal as="li" delay={(meals.length % 3) * 70} className={meals.length % 3 === 0 ? "sm:col-span-2 lg:col-span-3" : undefined}>
+              <div className="flex h-full min-h-56 flex-col justify-between gap-8 border border-white/15 p-6 sm:p-8">
+                <div>
+                  <p className="eyebrow text-fog">Mix &amp; match</p>
+                  <p className="mt-4 font-display text-3xl font-black uppercase leading-[0.95]">Choose any combination</p>
+                  <p className="mt-3 max-w-sm text-sm text-white/70">
+                    Build your package, then pick how many of each dish you want every week.
+                  </p>
+                </div>
+                <CtaLink href="/order" className="self-start" data-track="menu_build_package">
+                  Build your package
+                </CtaLink>
+              </div>
+            </Reveal>
           </ul>
         )}
         {content.nutritionNote && (

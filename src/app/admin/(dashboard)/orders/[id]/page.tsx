@@ -15,6 +15,7 @@ import {
   ELIGIBILITY_REASON_LABELS,
   FULFILLMENT_LABELS,
   ORDER_STATUS_LABELS,
+  paymentMethodLabel,
 } from "@/lib/orders/labels";
 import { getSettings } from "@/lib/settings";
 import { formatCalendarDate, formatDateTime } from "@/lib/time";
@@ -22,6 +23,7 @@ import { fillTemplate, whatsappLink } from "@/lib/whatsapp";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { quickOrderStatus, retryOrderEmail } from "../actions";
 import { DetailRow, EligibilityBadge, OrderStatusBadge, PaymentBadge } from "../order-ui";
+import { MarkPaidMenu, MarkUnpaidButton } from "../payment-actions";
 import { EligibilityDecisionForm, NoteForm, PricePaymentForm, StatusForm } from "./order-forms";
 
 export const metadata = { title: "Order" };
@@ -30,6 +32,7 @@ const EMAIL_TYPE_LABELS: Record<string, string> = {
   ORDER_BUSINESS_NOTIFICATION: "Notification to you",
   ORDER_CUSTOMER_CONFIRMATION: "Confirmation to customer",
   TEST: "Test email",
+  ACCOUNT_PASSWORD_RESET: "Password reset link",
 };
 
 const EMAIL_STATUS_TONES = { SENT: "good", PENDING: "info", SENDING: "info", FAILED: "warn", DEAD: "bad" } as const;
@@ -43,13 +46,14 @@ const EMAIL_STATUS_LABELS: Record<string, string> = {
 
 const NEXT_STEPS: Record<OrderStatus, { status: OrderStatus; label: string; icon: React.ComponentType<{ className?: string }> }[]> = {
   NEW: [
-    { status: "CONTACTED", label: "Mark contacted", icon: Phone },
-    { status: "CONFIRMED", label: "Mark confirmed", icon: CheckCircle2 },
+    { status: "CONFIRMED", label: "Confirm order", icon: CheckCircle2 },
+    { status: "CONTACTED", label: "Awaiting confirmation", icon: Phone },
   ],
-  CONTACTED: [{ status: "CONFIRMED", label: "Mark confirmed", icon: CheckCircle2 }],
+  CONTACTED: [{ status: "CONFIRMED", label: "Confirm order", icon: CheckCircle2 }],
   CONFIRMED: [
     { status: "IN_PREPARATION", label: "In preparation", icon: ClipboardList },
     { status: "COMPLETED", label: "Mark completed", icon: PackageCheck },
+    { status: "CONTACTED", label: "Not confirmed yet", icon: RotateCw },
   ],
   IN_PREPARATION: [{ status: "COMPLETED", label: "Mark completed", icon: PackageCheck }],
   COMPLETED: [],
@@ -150,6 +154,32 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         )}
       </div>
 
+      {/* Payment (recorded manually — no online payments) */}
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+        <span className="px-1 text-sm font-medium text-muted-foreground">Payment:</span>
+        {order.paymentStatus === "PAID" ? (
+          <>
+            <PaymentBadge status="PAID" />
+            <span className="text-sm">
+              {order.paidAmountCents !== null ? formatMoney(order.paidAmountCents, order.currency) : null}
+              {paymentMethodLabel(order.paymentProvider) ? ` · ${paymentMethodLabel(order.paymentProvider)}` : ""}
+              {order.paidAt ? ` · ${formatDateTime(order.paidAt, tz)}` : ""}
+            </span>
+            <MarkUnpaidButton orderId={order.id} reference={order.reference} />
+          </>
+        ) : order.status === "CANCELLED" ? (
+          <span className="text-sm text-muted-foreground">Cancelled — no payment expected.</span>
+        ) : (
+          <>
+            <PaymentBadge status={order.paymentStatus} />
+            <span className="text-sm text-muted-foreground">
+              Due: {money(order.confirmedTotalCents ?? order.totalCents)}
+            </span>
+            <MarkPaidMenu orderId={order.id} />
+          </>
+        )}
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <AdminCard title="Customer">
@@ -172,6 +202,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
                   "Not linked"
                 )}
               </DetailRow>
+              <DetailRow label="Website account">{order.account ? `Saved to ${order.account.email}` : "Not saved to an account"}</DetailRow>
               <DetailRow label="Flags">
                 {order.isReturningCustomer || order.isPotentialDuplicate ? (
                   <span className="flex flex-wrap gap-1.5">
@@ -185,10 +216,23 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
           <AdminCard title="Order & fulfilment">
             <dl className="divide-y">
-              <DetailRow label="Plan">
-                {order.planName} · {order.planDurationDays} days
-                {order.planMealsIncluded ? ` · ${order.planMealsIncluded} meals` : ""}
+              <DetailRow label={order.planMealsPerWeek ? "Package" : "Plan"}>
+                {order.planName}
+                {order.planMealsPerWeek
+                  ? ` · ${order.planMealsPerWeek} meals a week · ${order.planIsSubscription ? "monthly subscription (every 4 weeks)" : "1 week"}`
+                  : ` · ${order.planDurationDays} days${order.planMealsIncluded ? ` · ${order.planMealsIncluded} meals` : ""}`}
               </DetailRow>
+              {order.mealSelections.length > 0 && (
+                <DetailRow label="Dishes per week">
+                  <ul className="space-y-0.5">
+                    {order.mealSelections.map((m) => (
+                      <li key={m.id}>
+                        <span className="font-semibold tabular">{m.quantity}×</span> {m.mealName}
+                      </li>
+                    ))}
+                  </ul>
+                </DetailRow>
+              )}
               <DetailRow label="Fulfilment">
                 <span className="inline-flex items-center gap-1.5">
                   <Truck className="size-4 text-muted-foreground" /> {FULFILLMENT_LABELS[order.fulfillmentMethod]}

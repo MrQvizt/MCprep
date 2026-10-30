@@ -122,7 +122,7 @@ export function HomeFaq({ content, faqs, whatsappHref }: { content: ContentOf<"h
 }
 
 export function HomeFinalCta({ content, whatsappHref }: { content: ContentOf<"home.finalCta">; whatsappHref: string | null }) {
-  const cta = isSafeHref(content.cta.href) ? content.cta : { label: "Start your plan", href: "/plans" };
+  const cta = isSafeHref(content.cta.href) ? content.cta : { label: "Build your package", href: "/order" };
   return (
     <Section tone="paper" aria-labelledby="final-cta-title" className="relative overflow-hidden">
       <div

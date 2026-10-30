@@ -13,6 +13,12 @@ export interface OrderEmailData {
   planName: string;
   planDurationDays: number;
   planMealsIncluded: number | null;
+  /** Packages: "Lunch + Dinner · 5 days". */
+  packageLabel?: string | null;
+  planIsSubscription?: boolean;
+  planMealsPerWeek?: number | null;
+  /** Dishes chosen per week. */
+  mealSelections?: { name: string; quantity: number }[];
   currency: string;
   basePriceCents: number | null;
   deliveryFeeCents: number;
@@ -104,9 +110,27 @@ function fulfilmentSummary(o: OrderEmailData): string {
 }
 
 function planSummary(o: OrderEmailData) {
+  if (o.packageLabel) {
+    const perWeek = o.planMealsPerWeek ? `${o.planMealsPerWeek} meals a week` : null;
+    const billing = o.planIsSubscription
+      ? `Monthly subscription (renews every ${Math.max(1, Math.round(o.planDurationDays / 7))} weeks)`
+      : "One week";
+    return [o.packageLabel, perWeek, billing].filter(Boolean).join(" · ");
+  }
   const parts = [`${o.planName} (${o.planDurationDays} days)`];
   if (o.planMealsIncluded) parts.push(`${o.planMealsIncluded} meals`);
   return parts.join(" · ");
+}
+
+/** "2× Chicken Poke Bowl, 3× Mexican Beef Bowl" (per week). */
+export function dishesSummary(o: Pick<OrderEmailData, "mealSelections">): string | null {
+  if (!o.mealSelections?.length) return null;
+  return o.mealSelections.map((m) => `${m.quantity}× ${m.name}`).join(", ") + " (per week)";
+}
+
+function renewalNote(o: OrderEmailData): string | null {
+  if (!o.planIsSubscription || o.basePriceCents === null) return null;
+  return `${formatMoney(o.basePriceCents, o.currency)} every ${Math.max(1, Math.round(o.planDurationDays / 7))} weeks after the first period`;
 }
 
 // ── Business notification ───────────────────────────────────────────────────
@@ -142,7 +166,8 @@ export function renderBusinessOrderEmail(o: OrderEmailData, brand: EmailBrand, a
       (needsReview && o.basePriceCents !== null
         ? row("Total without promotion", money(o.basePriceCents + o.deliveryFeeCents, o.currency))
         : "") +
-      (o.promotionEndsAt ? row("Campaign ends", formatDateTime(o.promotionEndsAt, brand.timeZone)) : "") +
+      (o.promotionEndsAt ? row("Offer ends", formatDateTime(o.promotionEndsAt, brand.timeZone)) : "") +
+      row("Subscription", renewalNote(o)) +
       row("Payment", "Not collected — arrange with the customer"),
   );
 
@@ -162,7 +187,8 @@ ${table(
 )}
 <h2 style="font-size:15px;margin:20px 0 0;text-transform:uppercase;letter-spacing:1px;">Order</h2>
 ${table(
-  row("Plan", planSummary(o)) +
+  row("Package", planSummary(o)) +
+    row("Dishes", dishesSummary(o)) +
     row("Fulfilment", fulfilmentSummary(o)) +
     row("Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null) +
     row("Meal preference", o.mealPreference) +
@@ -190,7 +216,8 @@ ${pricing}
     ]),
     "\nORDER",
     textLines([
-      ["Plan", planSummary(o)],
+      ["Package", planSummary(o)],
+      ["Dishes", dishesSummary(o)],
       ["Fulfilment", fulfilmentSummary(o)],
       ["Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null],
       ["Meal preference", o.mealPreference],
@@ -208,7 +235,8 @@ ${pricing}
       ],
       ["Delivery fee", o.deliveryFeeCents > 0 ? formatMoney(o.deliveryFeeCents, o.currency) : null],
       [needsReview ? "Quoted total (if eligible)" : "Quoted total", money(o.totalCents, o.currency)],
-      ["Campaign ends", o.promotionEndsAt ? formatDateTime(o.promotionEndsAt, brand.timeZone) : null],
+      ["Offer ends", o.promotionEndsAt ? formatDateTime(o.promotionEndsAt, brand.timeZone) : null],
+      ["Subscription", renewalNote(o)],
       ["Payment", "Not collected"],
     ]),
     `\nOpen in admin: ${adminOrderUrl}`,
@@ -221,8 +249,24 @@ ${pricing}
 
 // ── Customer confirmation ───────────────────────────────────────────────────
 
-export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): RenderedEmail {
+/** Account link: the customer's account, or sign-up pre-filled from this order. */
+export interface CustomerAccountLink {
+  url: string;
+  saved: boolean;
+}
+
+export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand, account?: CustomerAccountLink): RenderedEmail {
   const firstName = o.customerName.split(/\s+/)[0] || o.customerName;
+  const accountHtml = account
+    ? account.saved
+      ? `<p style="margin:16px 0 0;">This order is saved in <a href="${escapeHtml(account.url)}" style="color:#080808;">your account</a>, where you can order it again any time.</p>`
+      : `<p style="margin:16px 0 0;"><strong>Order again in two taps:</strong> <a href="${escapeHtml(account.url)}" style="color:#080808;">create a free account</a> to save this order and keep your details filled in.</p>`
+    : "";
+  const accountText = account
+    ? account.saved
+      ? `This order is saved in your account: ${account.url}`
+      : `Order again in two taps — create a free account to save this order: ${account.url}`
+    : null;
   const subject = safeHeader(`We've received your order request — ${o.reference}`);
   const promoNote =
     o.promotionName && o.promotionRequiresVerification
@@ -233,7 +277,8 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
     : "";
 
   const pricingRows =
-    row("Plan", planSummary(o)) +
+    row("Package", planSummary(o)) +
+    row("Dishes", dishesSummary(o)) +
     row("Fulfilment", o.fulfillmentMethod === "DELIVERY" ? `Delivery — ${o.deliveryLocality ?? ""}` : FULFILLMENT_LABELS.COLLECTION) +
     row("Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null) +
     row("Plan price", money(o.basePriceCents, o.currency)) +
@@ -241,7 +286,8 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
       ? row(o.promotionRequiresVerification ? "Requested offer" : "Offer", `−${formatMoney(o.discountCents, o.currency)} (${o.promotionName})`)
       : "") +
     (o.deliveryFeeCents > 0 ? row("Delivery fee", formatMoney(o.deliveryFeeCents, o.currency)) : "") +
-    row(o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency));
+    row(o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency)) +
+    row("Then", renewalNote(o));
 
   const contactLines = [
     brand.whatsappLink ? `<a href="${escapeHtml(brand.whatsappLink)}" style="color:#080808;">WhatsApp</a>` : null,
@@ -256,6 +302,7 @@ export function renderCustomerOrderEmail(o: OrderEmailData, brand: EmailBrand): 
 <p style="margin:0 0 12px;">Your order request <strong>${escapeHtml(o.reference)}</strong> is pending confirmation. <strong>No payment has been taken.</strong> Our team will contact you to confirm availability, ${o.fulfillmentMethod === "DELIVERY" ? "delivery" : "collection"} details and payment.</p>
 ${promoNote}${allergyNote}
 ${table(pricingRows)}
+${accountHtml}
 ${contactLines.length ? `<p style="margin:16px 0 0;">Questions? Reach us via ${contactLines.join(" · ")}.</p>` : ""}`,
   );
 
@@ -268,13 +315,16 @@ ${contactLines.length ? `<p style="margin:16px 0 0;">Questions? Reach us via ${c
       : "",
     "",
     textLines([
-      ["Plan", planSummary(o)],
+      ["Package", planSummary(o)],
+      ["Dishes", dishesSummary(o)],
       ["Preferred start", o.preferredStartDate ? formatCalendarDate(o.preferredStartDate) : null],
       ["Plan price", money(o.basePriceCents, o.currency)],
       ["Offer", o.promotionName && o.discountCents > 0 ? `-${formatMoney(o.discountCents, o.currency)} (${o.promotionName})` : null],
       ["Delivery fee", o.deliveryFeeCents > 0 ? formatMoney(o.deliveryFeeCents, o.currency) : null],
       [o.promotionRequiresVerification ? "Estimated total" : "Quoted total", money(o.totalCents, o.currency)],
+      ["Then", renewalNote(o)],
     ]),
+    accountText ? `\n${accountText}` : null,
     brand.publicEmail ? `\nQuestions? Email ${brand.publicEmail}` : "",
   ]
     .filter((l) => l !== null)
@@ -288,5 +338,21 @@ export function renderTestEmail(brand: EmailBrand): RenderedEmail {
     subject: safeHeader(`${brand.tradingName} — test email`),
     html: layout(brand, "Test email", `<h1 style="margin:0 0 12px;font-size:22px;">Email delivery works.</h1><p>This is a test email sent from your website's admin portal. Order notifications will arrive the same way.</p>`),
     text: "Email delivery works. This is a test email sent from your website's admin portal.",
+  };
+}
+
+export function renderPasswordResetEmail(brand: EmailBrand, name: string, link: string): RenderedEmail {
+  const firstName = name.split(/\s+/)[0] || name;
+  return {
+    subject: safeHeader(`Reset your ${brand.tradingName} password`),
+    html: layout(
+      brand,
+      "Use this link within an hour to choose a new password.",
+      `<h1 style="margin:0 0 12px;font-size:22px;">Hi ${escapeHtml(firstName)},</h1>
+<p style="margin:0 0 16px;">Someone (hopefully you) asked to reset the password for your ${escapeHtml(brand.tradingName)} account. The link works once, for the next hour.</p>
+<p style="margin:24px 0;"><a href="${escapeHtml(link)}" style="display:inline-block;background:#080808;color:#ffffff;text-decoration:none;padding:12px 20px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:13px;">Choose a new password</a></p>
+<p style="margin:0;color:#595959;font-size:13px;">If you didn't ask for this, you can ignore this email — your password stays the same.</p>`,
+    ),
+    text: `Hi ${firstName},\n\nUse this link within an hour to choose a new password for your ${brand.tradingName} account:\n${link}\n\nIf you didn't ask for this, ignore this email — your password stays the same.`,
   };
 }

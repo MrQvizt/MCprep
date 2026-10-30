@@ -122,8 +122,8 @@ export default async function ContactPage() {
             </h2>
             <p className="mt-3 max-w-xl text-smoke">Choose a plan and send your request online — we&apos;ll contact you to confirm everything.</p>
           </div>
-          <CtaLink href="/plans" variant="dark" size="lg">
-            Choose your plan
+          <CtaLink href="/order" variant="dark" size="lg">
+            Build your package
           </CtaLink>
         </div>
       </Section>

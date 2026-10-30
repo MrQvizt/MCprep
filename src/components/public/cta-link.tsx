@@ -45,7 +45,7 @@ export function CtaLink({
   const external = /^https?:\/\//.test(href);
   const content = (
     <>
-      <span>{children}</span>
+      <span className="inline-flex items-center gap-2">{children}</span>
       {arrow && (
         <ArrowRight
           aria-hidden="true"

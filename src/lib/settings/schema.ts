@@ -104,6 +104,10 @@ export const fulfillmentSettingsSchema = z.object({
   ),
   leadTimeDays: z.number().int().min(0).max(60).catch(1).default(1),
   gozoNote: str(""),
+  /** Weekly ordering deadline: orders before it are for next week (business time zone). */
+  weeklyCutoffEnabled: bool(true),
+  weeklyCutoffDay: z.number().int().min(0).max(6).catch(3).default(3), // Wednesday
+  weeklyCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).catch("16:00").default("16:00"),
 });
 
 export const orderFormSettingsSchema = z.object({

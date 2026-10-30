@@ -18,9 +18,9 @@ export function MealCard({ meal, className, priority }: { meal: PublicMeal; clas
           priority={priority}
           placeholderLabel={`${meal.name} — photo coming soon`}
         />
-        {(meal.label || meal.isFeatured) && (
+        {meal.label && (
           <p className="absolute left-4 top-4 bg-white px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink">
-            {meal.label || "Featured"}
+            {meal.label}
           </p>
         )}
       </div>

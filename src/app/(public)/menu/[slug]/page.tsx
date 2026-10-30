@@ -133,8 +133,8 @@ export default async function MealPage({ params }: PageProps<"/menu/[slug]">) {
               </p>
 
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <CtaLink href="/plans" size="lg">
-                  Choose a plan
+                <CtaLink href="/order" size="lg" data-track="meal_build_package">
+                  Build your package
                 </CtaLink>
                 <CtaLink href="/menu" variant="outline" size="lg" arrow={false} className="border-white/40">
                   <span className="inline-flex items-center gap-2">

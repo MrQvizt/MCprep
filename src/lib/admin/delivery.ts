@@ -278,6 +278,9 @@ export const fulfillmentFormSchema = z
       .min(0, "Can't be negative.")
       .max(60, "Use 60 days or fewer."),
     gozoNote: z.string().trim().max(600),
+    weeklyCutoffEnabled: z.boolean(),
+    weeklyCutoffDay: z.coerce.number().int().min(0, "Choose a day.").max(6, "Choose a day."),
+    weeklyCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 16:00."),
   })
   .superRefine((d, ctx) => {
     if (!d.deliveryEnabled && !d.collectionEnabled) {
@@ -298,5 +301,8 @@ export function fulfillmentFormValues(fd: FormData) {
     noDeliveryAreasMessage: fdString(fd, "noDeliveryAreasMessage"),
     leadTimeDays: fdString(fd, "leadTimeDays") || "0",
     gozoNote: fdString(fd, "gozoNote"),
+    weeklyCutoffEnabled: fdBool(fd, "weeklyCutoffEnabled"),
+    weeklyCutoffDay: fdString(fd, "weeklyCutoffDay") || "3",
+    weeklyCutoffTime: fdString(fd, "weeklyCutoffTime") || "16:00",
   };
 }

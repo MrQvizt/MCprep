@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "EmailType" ADD VALUE 'ACCOUNT_PASSWORD_RESET';
+

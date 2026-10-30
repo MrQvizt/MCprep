@@ -4,7 +4,7 @@ import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { ChecklistToggle } from "@/components/admin/seo/checklist-toggle";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { AREA_ROLES, requireAdmin } from "@/lib/authz";
-import { emailTransport, env } from "@/lib/env";
+import { emailTransport, env, storageDriverName } from "@/lib/env";
 import { getChecklist, getLaunchReadiness, monthKey, monthLabel, MONTHLY_ITEMS, type LaunchItem } from "@/lib/launch";
 import { formatDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export default async function LaunchPage({ searchParams }: PageProps<"/admin/lau
     { label: "Session secret (AUTH_SECRET)", ok: Boolean(e.AUTH_SECRET) },
     { label: "Website address (NEXT_PUBLIC_SITE_URL)", ok: Boolean(e.NEXT_PUBLIC_SITE_URL?.startsWith("https://")), value: e.NEXT_PUBLIC_SITE_URL ?? "not set" },
     { label: "Email provider (RESEND_API_KEY + EMAIL_FROM)", ok: transport === "resend" && Boolean(e.EMAIL_FROM), value: transport },
-    { label: "Image storage (STORAGE_DRIVER)", ok: e.STORAGE_DRIVER === "s3", value: e.STORAGE_DRIVER },
+    { label: "Image storage (STORAGE_DRIVER)", ok: storageDriverName() !== "local", value: storageDriverName() },
     { label: "Scheduled jobs secret (CRON_SECRET)", ok: Boolean(e.CRON_SECRET) },
   ];
 
