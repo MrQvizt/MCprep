@@ -108,7 +108,7 @@ export interface OrderFormProps {
   declarationText: string;
   minStartDate: string;
   maxStartDate: string;
-  /** Weekly ordering deadline ("order before Wednesday 4pm for next week"). */
+  /** Weekly ordering deadline ("order by Wed 4 Nov, 4pm for delivery from Mon 9 Nov"). */
   cutoff: OrderCutoffProps | null;
   whatsappHref: string | null;
   turnstileSiteKey: string | null;

@@ -39,10 +39,24 @@ function useCutoff(p: OrderCutoffProps) {
   const m = Math.floor((remaining % 3600) / 60);
   const left = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
   const weekday = WEEKDAY_NAMES[new Date(`${cutoffDay}T00:00:00Z`).getUTCDay()];
-  return { cutoffDay, weekStart, left, weekday, urgent: remaining < 6 * 3600 };
+  return {
+    cutoffDay,
+    weekStart,
+    /** Monday after that (orders placed after the deadline start then). */
+    followingWeek: addDaysToDateString(weekStart, 7),
+    left,
+    weekday,
+    urgent: remaining < 6 * 3600,
+  };
 }
 
-/** Slim site-wide strip: "Order by Wed 4 Nov, 4pm for next week's delivery · 1d 5h left". */
+/** "Mon 9 Nov" → "9 Nov" */
+const dayMonth = (ymd: string) => formatShortDay(ymd).split(" ").slice(1).join(" ");
+
+/**
+ * Slim site-wide strip: "Order by Wed 4 Nov, 4pm for delivery from Mon 9 Nov · 5d 5h left".
+ * Always names the week: after Wednesday's deadline "next week" is already closed.
+ */
 export function OrderCutoffBar(p: OrderCutoffProps) {
   const pathname = usePathname();
   const c = useCutoff(p);
@@ -55,9 +69,12 @@ export function OrderCutoffBar(p: OrderCutoffProps) {
       >
         <CalendarClock className="size-3.5 shrink-0" aria-hidden="true" />
         <span>
-          <span className="sm:hidden">Next week: order by {c.weekday.slice(0, 3)} {p.timeLabel}</span>
+          <span className="sm:hidden">
+            Week of {dayMonth(c.weekStart)}: order by {c.weekday.slice(0, 3)} {p.timeLabel}
+          </span>
           <span className="hidden sm:inline">
-            For delivery next week, order by <strong className="font-semibold">{formatShortDay(c.cutoffDay)}, {p.timeLabel}</strong>
+            Order by <strong className="font-semibold">{formatShortDay(c.cutoffDay)}, {p.timeLabel}</strong> for delivery from{" "}
+            <strong className="font-semibold">{formatShortDay(c.weekStart)}</strong>
           </span>
         </span>
         <span className={cn("rounded-sm px-1.5 py-0.5 tabular", c.urgent ? "bg-white text-ink" : "bg-white/10")}>{c.left} left</span>
@@ -74,11 +91,12 @@ export function OrderCutoffCard(p: OrderCutoffProps & { className?: string }) {
       <CalendarClock className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
       <div>
         <p className="font-semibold">
-          For delivery next week, order before {c.weekday} {p.timeLabel}.
+          Order by {formatShortDay(c.cutoffDay)}, {p.timeLabel} for delivery from {formatShortDay(c.weekStart)}.
         </p>
         <p className="mt-1 text-fog">
-          Orders placed by <span className="text-white">{formatShortDay(c.cutoffDay)}, {p.timeLabel}</span> (Malta time) start the week of{" "}
-          <span className="text-white">{formatShortDay(c.weekStart)}</span>. Orders after that start the following week.{" "}
+          Orders close every {c.weekday} at {p.timeLabel} (Malta time) for the following week. Orders placed after{" "}
+          <span className="text-white">{formatShortDay(c.cutoffDay)}, {p.timeLabel}</span> start from{" "}
+          <span className="text-white">{formatShortDay(c.followingWeek)}</span>.{" "}
           <span className={cn("tabular", c.urgent ? "font-semibold text-white" : "")}>Closes in {c.left}.</span>
         </p>
       </div>

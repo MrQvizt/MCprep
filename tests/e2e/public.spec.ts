@@ -108,6 +108,32 @@ test.describe("public pages, crawlable Malta content and metadata", () => {
     await expect(page.getByRole("timer").first()).toBeVisible(); // does not reset/disappear on refresh
   });
 
+  test("the homepage leads with the €6 first-week offer and its countdown, then the packages", async ({ page }) => {
+    await page.goto("/");
+    const offer = page.getByRole("region", { name: "New customer offer" });
+    await expect(offer).toBeVisible();
+    await expect(offer).toContainText("First week €6 a meal");
+    await expect(offer).toContainText("10 meals for €60 instead of €95 — save €35");
+    await expect(offer.getByRole("timer")).toBeVisible();
+    await expect(offer.getByRole("link", { name: /Claim €6 meals/ })).toHaveAttribute("href", "/order");
+    // Shown once: the small offer strip at the top of other pages is hidden here.
+    await expect(page.locator('[data-promotion="first-week-6-euro"]')).toHaveCount(1);
+    // Packages come straight after the hero, before the menu.
+    const order = await page.evaluate(() => {
+      const plans = document.getElementById("plans");
+      const menu = [...document.querySelectorAll("h2")].find((h) => /menu/i.test(h.textContent ?? ""));
+      return plans && menu ? plans.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING : 0;
+    });
+    expect(order).toBeTruthy();
+  });
+
+  test("the ordering deadline names the week it is for", async ({ page }) => {
+    await page.goto("/menu");
+    const note = page.getByRole("note", { name: "Ordering deadline" });
+    await expect(note).toContainText(/Order by \w{3} \d{1,2} \w{3}, 4pm for delivery from Mon \d{1,2} \w{3}/);
+    await expect(note).not.toContainText("next week");
+  });
+
   test("the first-week offer's personal 2-hour window doesn't restart on reload", async ({ page }) => {
     await page.goto("/menu");
     const bar = page.locator('[data-promotion="first-week-6-euro"]').first();

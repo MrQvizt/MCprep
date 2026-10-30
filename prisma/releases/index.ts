@@ -177,6 +177,17 @@ export const RELEASES: Release[] = [
       }
     },
   },
+  {
+    id: "2026-10-30-hide-preview-notice",
+    description: "Turn off the “Preview site” notice at the top of every page (owner request)",
+    async run(db, log) {
+      const row = await db.siteSetting.findUnique({ where: { key: "site" } });
+      const current = row?.value && typeof row.value === "object" && !Array.isArray(row.value) ? (row.value as Record<string, unknown>) : {};
+      const value = { ...current, showDemoNotice: false };
+      await db.siteSetting.upsert({ where: { key: "site" }, create: { key: "site", value }, update: { value } });
+      log("Preview notice turned off");
+    },
+  },
 ];
 
 /** Run releases that haven't run yet, in order. Returns the ids applied now. */

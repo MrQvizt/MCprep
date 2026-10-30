@@ -123,11 +123,27 @@ export function PackageBuilder({
     if (target) onSelect(target.slug);
   };
 
-  const cheapestPerMeal = (filter: (p: PackageOption) => boolean) => {
-    const values = packages.filter(filter).map((p) => p.perMealCents).filter((v): v is number => v !== null);
-    return values.length ? Math.min(...values) : null;
+  const weekly = packages.filter((p) => !p.isSubscription);
+  /** "5 or 7 meals a week · €10–€10.50 a meal" for one meals-per-day choice. */
+  const mealsNote = (m: number) => {
+    const opts = weekly.filter((p) => p.mealsPerDay === m && p.mealsPerWeek);
+    if (opts.length === 0) return undefined;
+    const counts = [...new Set(opts.map((p) => p.mealsPerWeek!))].sort((a, b) => a - b);
+    const prices = opts.map((p) => p.perMealCents).filter((v): v is number => v !== null);
+    const lo = Math.min(...prices);
+    const hi = Math.max(...prices);
+    const price = prices.length ? ` · ${lo === hi ? money(lo) : `${money(lo)}\u2060–\u2060${money(hi)}`} a meal` : "";
+    return `${counts.join(" or ")} meals a week${price}`;
   };
-  const fromLabel = (cents: number | null) => (cents !== null ? `from ${money(cents)} a meal` : undefined);
+  /** "5 meals · €10.50 a meal" for this day choice with the current meals per day (and weekly/monthly). */
+  const daysNote = (d: number) => {
+    const p =
+      findPackage(packages, { mealsPerDay, daysPerWeek: d, isSubscription }) ??
+      weekly.find((x) => x.mealsPerDay === mealsPerDay && x.daysPerWeek === d);
+    const when = d === 5 ? "Monday to Friday" : d === 7 ? "Every day" : null;
+    if (!p?.mealsPerWeek) return when ?? undefined;
+    return [`${p.mealsPerWeek} meals${p.isSubscription ? " a week" : ""}`, p.perMealCents !== null ? `${money(p.perMealCents)} a meal` : null, when].filter(Boolean).join(" · ");
+  };
 
   const monthlyHere = findPackage(packages, { mealsPerDay, daysPerWeek, isSubscription: true });
   const weeklyHere = findPackage(packages, { mealsPerDay, daysPerWeek, isSubscription: false });
@@ -144,7 +160,7 @@ export function PackageBuilder({
         choices={mealsOptions.map((m) => ({
           value: m,
           title: MEALS_PER_DAY_LABELS[m] ?? `${m} meals a day`,
-          note: fromLabel(cheapestPerMeal((p) => p.mealsPerDay === m && !p.isSubscription)),
+          note: mealsNote(m),
           badge: packages.some((p) => p.mealsPerDay === m && p.isRecommended) ? "Most popular" : null,
         }))}
       />
@@ -156,7 +172,7 @@ export function PackageBuilder({
         choices={dayOptions.map((d) => ({
           value: d,
           title: `${d} days`,
-          note: d === 5 ? "Monday to Friday" : d === 7 ? "Every day of the week" : undefined,
+          note: daysNote(d),
         }))}
       />
       {monthlyAnywhere && (

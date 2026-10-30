@@ -76,6 +76,16 @@ test.describe("order request journey", () => {
     await expect(page.locator("main")).toContainText(/New customer \(preliminary\)|eligib/i);
   });
 
+  test("each package choice shows its meals and price per meal", async ({ page }) => {
+    await page.goto("/order?plan=lunch-5-days");
+    const days = page.getByRole("group", { name: "Days per week" });
+    await expect(days).toContainText("5 meals · €10.50 a meal");
+    await expect(days).toContainText("7 meals · €10 a meal");
+    await page.locator("label").filter({ hasText: /^Lunch \+ Dinner/ }).first().click();
+    await expect(days).toContainText("10 meals · €9.50 a meal");
+    await expect(days).toContainText("14 meals · €8.50 a meal");
+  });
+
   test("shows clear validation errors and keeps what was typed", async ({ page }) => {
     await page.goto("/order?plan=lunch-5-days");
     await page.getByRole("textbox", { name: "Full name" }).fill("A");

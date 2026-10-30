@@ -2,9 +2,11 @@ import Image from "next/image";
 import type { ContentOf } from "@/lib/content/schema";
 import type { MediaRef } from "@/lib/media";
 import { isSafeHref } from "@/lib/urls";
+import { cn } from "@/lib/utils";
 import { CtaLink } from "../cta-link";
 import type { MenuCardMeal } from "../menu-card";
 import { HeroMenuCarousel } from "./hero-menu-carousel";
+import { HeroOffer, type HeroOfferData } from "./hero-offer";
 
 function HeroArt() {
   return (
@@ -37,6 +39,7 @@ export function HomeHero({
   meals,
   fromPerMeal,
   maxProtein,
+  offer = null,
 }: {
   hero: ContentOf<"home.hero">;
   image: MediaRef | null;
@@ -44,6 +47,8 @@ export function HomeHero({
   /** Cheapest price per meal across packages, formatted (e.g. "€8.04"). */
   fromPerMeal: string | null;
   maxProtein: number | null;
+  /** Live "order within 2 hours" offer, shown first. */
+  offer?: HeroOfferData | null;
 }) {
   const primary = isSafeHref(hero.primaryCta.href) ? hero.primaryCta : { label: "Build your package", href: "/order" };
   const secondary = isSafeHref(hero.secondaryCta.href) ? hero.secondaryCta : { label: "See the menu", href: "/menu" };
@@ -76,7 +81,17 @@ export function HomeHero({
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-ink/0" />
       </div>
 
-      <div className="container-site grid gap-12 pb-14 pt-12 sm:pt-16 lg:min-h-[calc(92svh-5rem)] lg:grid-cols-12 lg:items-center lg:gap-10 lg:pb-20">
+      {offer && (
+        <div className="container-site pt-5 sm:pt-8">
+          <HeroOffer offer={offer} />
+        </div>
+      )}
+      <div
+        className={cn(
+          "container-site grid gap-12 pb-14 lg:grid-cols-12 lg:items-center lg:gap-10 lg:pb-20",
+          offer ? "pt-10 sm:pt-12" : "pt-12 sm:pt-16 lg:min-h-[calc(92svh-5rem)]",
+        )}
+      >
         <div className="lg:col-span-7">
           <h1 id="hero-title">
             <span className="eyebrow flex items-center gap-3 text-white/85 animate-in fade-in slide-in-from-bottom-2 duration-700">
